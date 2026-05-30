@@ -1,0 +1,30 @@
+{
+  "name": "maskjs",
+  "version": "1.0.0",
+  "description": "Engine de máscaras declarativo — framework-agnostic, zero dependências, ~4kb",
+  "main": "./mask.cjs.js",
+  "module": "./mask.js",
+  "types": "./mask.d.ts",
+  "exports": {
+    ".": {
+      "import": "./mask.js",
+      "require": "./mask.cjs.js",
+      "types": "./mask.d.ts"
+    }
+  },
+  "files": [
+    "mask.js",
+    "mask.cjs.js",
+    "mask.d.ts",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "keywords": [
+    "mask", "input-mask", "form", "cpf", "cnpj", "phone",
+    "date", "money", "react", "vue", "svelte", "vanilla"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=16"
+  }
+}
