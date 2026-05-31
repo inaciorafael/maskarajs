@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import mask from '../../mask.js'
-import QrCodePix from './assets/qrcode-pix.png'
+import { DonationSupport } from './components/DonationSupport'
+import { TopNav, type Locale, type Theme } from './components/TopNav'
 import './App.css'
 
-type Framework = 'React' | 'Vue' | 'Vanilla'
+type Framework = 'React' | 'Vue' | 'Angular' | 'React Native' | 'Vanilla'
 type RegistryName = 'BR' | 'US'
-type Locale = 'pt-BR' | 'en'
 type BlockKind = 'slot' | 'literal' | 'expr' | 'name' | 'pattern'
 
 type Preset = {
@@ -23,7 +23,13 @@ type Example = {
   description: string
 }
 
-const PIX_KEY = 'a278d104-0d88-438c-aef8-c7fa4a894cc1'
+type HookExample = {
+  framework: string
+  title: string
+  description: string
+  code?: string
+  soon?: boolean
+}
 
 const namedPatterns: Record<string, string | string[]> = {
   month: '{0-1}#',
@@ -104,71 +110,121 @@ const maskUS = mask.create({
 })
 
 const snippets: Record<Framework, string> = {
-  React: `import { useEffect, useRef, useState } from 'react'
+  React: `import { useState } from 'react'
 import mask from 'maskarajs'
 
-export function useMask<T = string>(pattern, options = {}) {
-  const ref = useRef<HTMLInputElement>(null)
-  const [raw, setRaw] = useState<T | string>('')
+const cpfPattern = '###[.]###[.]###[-]##'
+
+export function CPFInput() {
   const [masked, setMasked] = useState('')
+  const raw = mask.raw(cpfPattern, masked)
+  const complete = mask.is(cpfPattern, masked)
 
-  useEffect(() => {
-    if (!ref.current) return
-    return mask.on<T>(ref.current, pattern, {
-      onValue: value => {
-        setRaw(value)
-        options.onValue?.(value)
-      },
-      onMasked: value => {
-        setMasked(value)
-        options.onMasked?.(value)
-      },
-    })
-  }, [pattern])
+  return (
+    <label>
+      CPF
+      <input
+        value={masked}
+        placeholder={mask.hint(cpfPattern)}
+        inputMode="numeric"
+        onChange={event => setMasked(mask(cpfPattern, event.target.value))}
+      />
+      <small>raw: {raw} / complete: {String(complete)}</small>
+    </label>
+  )
+}`,
+  Vue: `<script setup lang="ts">
+import { computed, ref } from 'vue'
+import mask from 'maskarajs'
 
-  return {
-    ref,
-    raw,
-    masked,
-    complete: mask.is(pattern, masked),
-    placeholder: mask.hint(pattern),
+const pattern = '#####[-]###'
+const masked = ref('')
+const raw = computed(() => mask.raw(pattern, masked.value))
+const complete = computed(() => mask.is(pattern, masked.value))
+
+function update(value: string) {
+  masked.value = mask(pattern, value)
+}
+</script>
+
+<template>
+  <input
+    :value="masked"
+    :placeholder="mask.hint(pattern)"
+    inputmode="numeric"
+    @input="update(($event.target as HTMLInputElement).value)"
+  />
+  <small>raw: {{ raw }} / complete: {{ complete }}</small>
+</template>`,
+  Angular: `import { Component } from '@angular/core'
+import mask from 'maskarajs'
+
+@Component({
+  selector: 'app-cpf-field',
+  template: \`
+    <input
+      [value]="masked"
+      [placeholder]="placeholder"
+      inputmode="numeric"
+      (input)="onInput($event)"
+    />
+    <small>raw: {{ raw }} / complete: {{ complete }}</small>
+  \`,
+})
+export class CpfFieldComponent {
+  pattern = '###[.]###[.]###[-]##'
+  masked = ''
+
+  get raw() {
+    return mask.raw(this.pattern, this.masked)
+  }
+
+  get complete() {
+    return mask.is(this.pattern, this.masked)
+  }
+
+  get placeholder() {
+    return mask.hint(this.pattern)
+  }
+
+  onInput(event: Event) {
+    const input = event.target as HTMLInputElement
+    this.masked = mask(this.pattern, input.value)
   }
 }`,
-  Vue: `// directives/maskarajs.ts
-import type { Directive } from 'vue'
+  'React Native': `import { useState } from 'react'
+import { Text, TextInput, View } from 'react-native'
 import mask from 'maskarajs'
 
-type MaskBinding = string | string[] | {
-  pattern: string | string[]
-  onValue?: (value: unknown) => void
-  onMasked?: (value: string) => void
-}
+const phonePattern = ['[(]##[)] ####[-]####', '[(]##[)] #####[-]####']
 
-export const vMaskara: Directive<HTMLInputElement, MaskBinding> = {
-  mounted(el, binding) {
-    const config = Array.isArray(binding.value) || typeof binding.value === 'string'
-      ? { pattern: binding.value }
-      : binding.value
+export function PhoneField() {
+  const [masked, setMasked] = useState('')
+  const raw = mask.raw(phonePattern, masked)
 
-    ;(el as any)._maskaraOff = mask.on(el, config.pattern, {
-      onValue: config.onValue,
-      onMasked: config.onMasked,
-    })
-  },
-  unmounted(el) {
-    ;(el as any)._maskaraOff?.()
-  },
+  return (
+    <View>
+      <TextInput
+        value={masked}
+        placeholder={mask.hint(phonePattern)}
+        keyboardType="number-pad"
+        onChangeText={value => setMasked(mask(phonePattern, value))}
+      />
+      <Text>raw: {raw}</Text>
+    </View>
+  )
 }`,
   Vanilla: `import mask from 'maskarajs'
 
 const input = document.querySelector<HTMLInputElement>('#phone')!
+const output = document.querySelector<HTMLElement>('#raw')!
 
 const off = mask.on(input, [
   '[(]##[)] ####[-]####',
   '[(]##[)] #####[-]####',
 ], {
   onValue(raw) {
-    console.log({ raw })
+    output.textContent = raw
   },
   onMasked(masked) {
     console.log({ masked })
@@ -177,6 +233,19 @@ const off = mask.on(input, [
 }
 
 const codeSnippets = {
+  reactHook: `import { useMask } from 'maskarajs/react'
+
+const cpfPattern = '###[.]###[.]###[-]##'
+
+export function CPFInput() {
+  const cpf = useMask(cpfPattern)
+
+  return (
+    <input
+      {...cpf.inputProps({ inputMode: 'numeric' })}
+    />
+  )
+}`,
   validate: `mask.define('month', {
   pattern: '{0-1}#',
   validate: (raw, masked, complete) => {
@@ -226,6 +295,11 @@ const content = {
   'pt-BR': {
     langName: 'Português',
     switchLabel: 'Idioma',
+    themeLabel: 'Tema',
+    theme: {
+      light: 'Claro',
+      dark: 'Escuro',
+    },
     pix: {
       support: 'Apoie o projeto',
       button: 'Pague um Monster',
@@ -324,9 +398,28 @@ const content = {
       ],
     },
     docs: {
-      eyebrow: 'Implementacao copiavel',
-      title: 'Hook para React, diretiva para Vue 3 e um caminho direto para Vanilla.',
-      text: 'Cole o hook, registre a diretiva ou use `mask.on` direto no input. O core continua o mesmo.',
+      eyebrow: 'Implementacao pura',
+      title: 'Use o core do maskarajs em qualquer stack, sem adaptador obrigatorio.',
+      text: 'React, Vue, Angular, React Native e Vanilla podem usar a mesma API: aplique mask() no input, leia raw() para salvar e is() para saber quando esta completo.',
+    },
+    reactForms: {
+      eyebrow: 'React forms',
+      title: 'Quando quiser conveniencia no React, use o hook pronto.',
+      text: 'O hook fica em maskarajs/react e entrega o que um input controlado precisa: value, onChange, raw, complete e inputProps.',
+      soon: 'Em breve',
+      cards: [
+        ['useMask', 'O caminho curto para inputs React controlados, mantendo masked na tela e raw disponivel no retorno.'],
+        ['useMaskDirective', 'Diretiva pensada para Vue 3, para aplicar mascara sem repetir handler em cada input.'],
+        ['maskarajsDirective', 'Diretiva Angular para conectar maskarajs ao template mantendo raw e complete acessiveis.'],
+        ['useNativeMask', 'Hook para React Native com a mesma ideia do core: valor mascarado na tela e raw pronto para salvar.'],
+      ],
+    },
+    install: {
+      eyebrow: 'Instalacao',
+      title: 'Comece com um comando e ja teste no seu input.',
+      text: 'Escolha seu gerenciador, copie o comando e leve o maskarajs para o formulario que mais precisa ficar simples.',
+      copied: 'Copiado',
+      copy: 'Copiar comando',
     },
     benchmark: {
       eyebrow: 'Performance',
@@ -358,6 +451,11 @@ const content = {
   en: {
     langName: 'English',
     switchLabel: 'Language',
+    themeLabel: 'Theme',
+    theme: {
+      light: 'Light',
+      dark: 'Dark',
+    },
     pix: {
       support: 'Support the project',
       button: 'Buy me a Monster',
@@ -456,9 +554,28 @@ const content = {
       ],
     },
     docs: {
-      eyebrow: 'Copy-ready implementation',
-      title: 'A React hook, a Vue 3 directive, and a direct Vanilla path.',
-      text: 'Paste the hook, register the directive, or use `mask.on` directly on the input. The core stays the same.',
+      eyebrow: 'Pure implementation',
+      title: 'Use the maskarajs core in any stack, with no required adapter.',
+      text: 'React, Vue, Angular, React Native, and Vanilla can use the same API: apply mask() in the input, read raw() for storage, and is() for completion.',
+    },
+    reactForms: {
+      eyebrow: 'React forms',
+      title: 'When you want React convenience, use the ready hook.',
+      text: 'The hook lives in maskarajs/react and gives a controlled input what it needs: value, onChange, raw, complete, and inputProps.',
+      soon: 'Coming soon',
+      cards: [
+        ['useMask', 'The shortest path for controlled React inputs, keeping masked on screen and raw in the returned object.'],
+        ['useMaskDirective', 'A Vue 3 directive designed to apply masks without repeating handlers on every input.'],
+        ['maskarajsDirective', 'An Angular directive to connect maskarajs to templates while keeping raw and complete available.'],
+        ['useNativeMask', 'A React Native hook with the same core idea: masked value on screen and raw ready to save.'],
+      ],
+    },
+    install: {
+      eyebrow: 'Install',
+      title: 'Start with one command and try it in your input.',
+      text: 'Pick your package manager, copy the command, and bring maskarajs into the form that needs to stay simple.',
+      copied: 'Copied',
+      copy: 'Copy command',
     },
     benchmark: {
       eyebrow: 'Performance',
@@ -596,6 +713,36 @@ function buildApiRows(locale: Locale) {
   ] as const
 }
 
+function buildHookExamples(locale: Locale): HookExample[] {
+  const t = content[locale].reactForms
+  return [
+    {
+      framework: 'React',
+      title: t.cards[0][0],
+      description: t.cards[0][1],
+      code: codeSnippets.reactHook,
+    },
+    {
+      framework: 'Vue 3',
+      title: t.cards[1][0],
+      description: t.cards[1][1],
+      soon: true,
+    },
+    {
+      framework: 'Angular',
+      title: t.cards[2][0],
+      description: t.cards[2][1],
+      soon: true,
+    },
+    {
+      framework: 'React Native',
+      title: t.cards[3][0],
+      description: t.cards[3][1],
+      soon: true,
+    },
+  ]
+}
+
 function parsePattern(text: string) {
   const trimmed = text.trim()
   if (trimmed.startsWith('[')) {
@@ -617,23 +764,30 @@ function stringify(value: unknown) {
 }
 
 function highlightCode(code: string) {
-  const lines = code.split('\n')
-  const tokenPattern = /(\/\/.*|`(?:\\.|[^`])*`|'(?:\\.|[^'])*'|"(?:\\.|[^"])*"|\b(?:import|from|export|const|let|return|if|true|false|null|new|function|type)\b|\b(?:mask|raw|define|defineSlot|create|is|hint|patternLength|rawLength|validate|transform|on|Number|Date|console|log)\b|\b\d+(?:\.\d+)?\b)/g
+  const tokenPattern = /(\/\/.*|\/\*[\s\S]*?\*\/|`(?:\\.|[^`])*`|'(?:\\.|[^'])*'|"(?:\\.|[^"])*"|<\/?[A-Z][A-Za-z0-9.]*\b|<\/?[a-z][A-Za-z0-9-]*\b|\b(?:import|from|export|const|let|return|if|else|true|false|null|undefined|new|function|type|interface|class|get|as|extends|public|private|readonly)\b|\b(?:mask|raw|define|defineSlot|create|is|hint|patternLength|rawLength|validate|transform|on|Number|Date|String|console|log|useState|useMemo|useEffect|useForm|useMask|inputProps|computed|ref|z|yup|Component|TextInput|View|Text)\b|\b\d+(?:\.\d+)?\b)/g
+  const nodes = []
+  let lastIndex = 0
 
-  return lines.map((line, lineIndex) => (
-    <span className="code-line" key={`${line}-${lineIndex}`}>
-      {line.split(tokenPattern).filter(Boolean).map((part, partIndex) => {
-        let className = 'code-plain'
-        if (part.startsWith('//')) className = 'code-comment'
-        else if (part.startsWith("'") || part.startsWith('"') || part.startsWith('`')) className = 'code-string'
-        else if (/^\d/.test(part)) className = 'code-number'
-        else if (/^(import|from|export|const|let|return|if|true|false|null|new|function|type)$/.test(part)) className = 'code-keyword'
-        else if (/^(mask|raw|define|defineSlot|create|is|hint|patternLength|rawLength|validate|transform|on|Number|Date|console|log)$/.test(part)) className = 'code-function'
-        return <span className={className} key={`${part}-${partIndex}`}>{part}</span>
-      })}
-      {lineIndex < lines.length - 1 ? '\n' : ''}
-    </span>
-  ))
+  for (const match of code.matchAll(tokenPattern)) {
+    const token = match[0]
+    const index = match.index ?? 0
+    if (index > lastIndex) nodes.push(<span key={`plain-${index}`}>{code.slice(lastIndex, index)}</span>)
+
+    const className = (() => {
+      if (token.startsWith('//') || token.startsWith('/*')) return 'code-comment'
+      if (token.startsWith("'") || token.startsWith('"') || token.startsWith('`')) return 'code-string'
+      if (token.startsWith('<')) return 'code-tag'
+      if (/^\d/.test(token)) return 'code-number'
+      if (/^(import|from|export|const|let|return|if|else|true|false|null|undefined|new|function|type|interface|class|get|as|extends|public|private|readonly)$/.test(token)) return 'code-keyword'
+      return 'code-function'
+    })()
+
+    nodes.push(<span className={className} key={`${className}-${index}`}>{token}</span>)
+    lastIndex = index + token.length
+  }
+
+  if (lastIndex < code.length) nodes.push(<span key="tail">{code.slice(lastIndex)}</span>)
+  return nodes
 }
 
 function CodeBlock({ code, className = 'snippet' }: { code: string; className?: string }) {
@@ -715,6 +869,41 @@ function SectionHeading({ eyebrow, title, text, compact = false }: { eyebrow: st
       <span>{eyebrow}</span>
       <h2>{title}</h2>
       {text ? <p>{text}</p> : null}
+    </div>
+  )
+}
+
+function InstallCommands({ locale }: { locale: Locale }) {
+  const t = content[locale].install
+  const [copied, setCopied] = useState('')
+  const commands = [
+    ['npm', 'npm install maskarajs'],
+    ['yarn', 'yarn add maskarajs'],
+    ['pnpm', 'pnpm add maskarajs'],
+  ] as const
+
+  async function copyCommand(command: string) {
+    await navigator.clipboard.writeText(command)
+    setCopied(command)
+    window.setTimeout(() => setCopied(''), 1400)
+  }
+
+  return (
+    <div className="install-card" aria-label={t.eyebrow}>
+      <div>
+        <span>{t.eyebrow}</span>
+        <strong>{t.title}</strong>
+        <p>{t.text}</p>
+      </div>
+      <div className="install-commands">
+        {commands.map(([manager, command]) => (
+          <button type="button" key={manager} onClick={() => copyCommand(command)} aria-label={`${t.copy}: ${command}`}>
+            <span>{manager}</span>
+            <code>{command}</code>
+            <small>{copied === command ? t.copied : t.copy}</small>
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
@@ -942,7 +1131,7 @@ function CustomSlotsDemo({ locale }: { locale: Locale }) {
   const t = content[locale].recipes
   const [globalValue, setGlobalValue] = useState(mask('NNN[-]NN', '12345'))
   const [hexValue, setHexValue] = useState(teamMask('HHHHHH', '1a2b3c'))
-  const [vowelValue, setVowelValue] = useState(teamMask('VVV', 'maskforge'))
+  const [vowelValue, setVowelValue] = useState(teamMask('VVV', 'maskarajs'))
   return (
     <article className="recipe-card slots-card">
       <RecipeCopy eyebrow="defineSlot()" title={t.slotsTitle} text={t.slotsText} />
@@ -1025,65 +1214,36 @@ function ApiDocsSection({ locale }: { locale: Locale }) {
   )
 }
 
-function MaskforgeLogo() {
-  return (
-    <a className="site-logo" href="#top" aria-label="Maskforge">
-      <svg viewBox="0 0 64 64" role="img" aria-label="Maskforge logo">
-        <path className="rune-plate" d="M13 15 C22 8, 43 8, 52 15 C58 24, 57 42, 51 50 C41 58, 23 58, 13 50 C7 41, 7 24, 13 15 Z" />
-        <path d="M20 43 C25 36, 29 28, 33 18" /><path d="M33 18 C38 28, 43 36, 48 43" /><path d="M25 34 C30 31, 35 31, 40 34" /><path d="M24 22 C28 25, 31 27, 35 30" /><path d="M42 22 C38 26, 35 29, 31 33" /><path className="rune-accent" d="M18 47 C27 51, 39 51, 48 47" /><circle cx="24" cy="39" r="1.7" /><circle cx="42" cy="39" r="1.7" />
-      </svg>
-      <span>Maskarajs</span>
-    </a>
-  )
-}
+function ReactFormsSection({ locale }: { locale: Locale }) {
+  const t = content[locale].reactForms
+  const examples = buildHookExamples(locale)
 
-function LanguageSwitch({ locale, onChange }: { locale: Locale; onChange: (locale: Locale) => void }) {
   return (
-    <div className="language-switch" aria-label={content[locale].switchLabel}>
-      {(['pt-BR', 'en'] as Locale[]).map((item) => <button key={item} type="button" aria-pressed={locale === item} onClick={() => onChange(item)}>{item === 'pt-BR' ? 'PT-BR' : 'EN'}</button>)}
-    </div>
-  )
-}
-
-function PixSupport({ locale, onOpen }: { locale: Locale; onOpen: () => void }) {
-  const t = content[locale].pix
-  return (
-    <aside className="pix-support" aria-label={t.support}>
-      <strong>{t.support}</strong>
-      <div className="pix-qr"><img src={QrCodePix} alt="QR Code Pix" onError={(event) => event.currentTarget.classList.add('is-missing')} /></div>
-      <button type="button" onClick={onOpen}>{t.button}</button>
-      <small>Pix: <code>{PIX_KEY}</code></small>
-    </aside>
-  )
-}
-
-function DonationPopup({ locale, open, onClose }: { locale: Locale; open: boolean; onClose: () => void }) {
-  const [copied, setCopied] = useState(false)
-  const t = content[locale].pix
-  if (!open) return null
-  async function copyPixKey() {
-    try {
-      await navigator.clipboard.writeText(PIX_KEY)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1800)
-    } catch {
-      setCopied(false)
-    }
-  }
-  return (
-    <div className="donation-overlay" role="presentation" onMouseDown={onClose}>
-      <section className="donation-popup" role="dialog" aria-modal="true" aria-labelledby="donation-title" onMouseDown={(event) => event.stopPropagation()}>
-        <button className="donation-close" type="button" aria-label={t.close} onClick={onClose}>x</button>
-        <div className="donation-copy"><span>{t.modalEyebrow}</span><h2 id="donation-title">{t.title}</h2><p>{t.body}</p></div>
-        <div className="donation-tiers" aria-label={t.button}>{t.tiers.map(([amount, title, description], index) => <article className={index === 1 ? 'featured' : ''} key={title}>{index === 1 ? <small>{t.popular}</small> : null}<strong>{amount}</strong><h3>{title}</h3><p>{description}</p></article>)}</div>
-        <div className="donation-payment"><div className="donation-qr"><img src={QrCodePix} alt="QR Code Pix" /></div><div><strong>{t.how}</strong><p>{t.howBody}</p><code>{PIX_KEY}</code><button type="button" onClick={copyPixKey}>{copied ? t.copied : t.copy}</button></div></div>
-      </section>
-    </div>
+    <section className="react-forms-section" id="react-forms">
+      <SectionHeading eyebrow={t.eyebrow} title={t.title} text={t.text} />
+      <div className="react-forms-grid">
+        {examples.map((example, index) => (
+          <article className={`react-form-card${example.soon ? ' is-soon' : ''}`} key={`${example.framework}-${example.title}`}>
+            <div>
+              <span>{String(index + 1).padStart(2, '0')} · {example.framework}</span>
+              <h3>{example.title}</h3>
+              <p>{example.description}</p>
+              {example.soon ? <strong className="soon-badge">{t.soon}</strong> : null}
+            </div>
+            {example.code ? <CodeBlock code={example.code} /> : <div className="hook-soon"><code>{example.title}</code><span>{t.soon}</span></div>}
+          </article>
+        ))}
+      </div>
+    </section>
   )
 }
 
 function App() {
-  const [locale, setLocale] = useState<Locale>(() => (window.localStorage.getItem('maskforge-locale') as Locale) || 'pt-BR')
+  const [locale, setLocale] = useState<Locale>(() => (window.localStorage.getItem('maskarajs-locale') as Locale) || 'pt-BR')
+  const [theme, setTheme] = useState<Theme>(() => {
+    const savedTheme = window.localStorage.getItem('maskarajs-theme')
+    return savedTheme === 'dark' || savedTheme === 'light' ? savedTheme : 'light'
+  })
   const [framework, setFramework] = useState<Framework>('React')
   const [donationOpen, setDonationOpen] = useState(false)
   const t = content[locale]
@@ -1091,29 +1251,43 @@ function App() {
   const examples = useMemo(() => buildExamples(locale), [locale])
 
   useEffect(() => {
-    window.localStorage.setItem('maskforge-locale', locale)
+    window.localStorage.setItem('maskarajs-locale', locale)
   }, [locale])
 
   useEffect(() => {
-    if (window.sessionStorage.getItem('maskforge-donation-seen')) return
+    document.documentElement.dataset.theme = theme
+    window.localStorage.setItem('maskarajs-theme', theme)
+  }, [theme])
+
+  useEffect(() => {
+    if (window.sessionStorage.getItem('maskarajs-donation-seen')) return
     const timer = window.setTimeout(() => {
       setDonationOpen(true)
-      window.sessionStorage.setItem('maskforge-donation-seen', 'true')
+      window.sessionStorage.setItem('maskarajs-donation-seen', 'true')
     }, 2200)
     return () => window.clearTimeout(timer)
   }, [])
 
   return (
-    <main id="top">
-      <MaskforgeLogo />
-      <LanguageSwitch locale={locale} onChange={setLocale} />
-      <PixSupport locale={locale} onOpen={() => setDonationOpen(true)} />
-      <DonationPopup locale={locale} open={donationOpen} onClose={() => setDonationOpen(false)} />
+    <main id="top" data-theme={theme}>
+      <TopNav
+        locale={locale}
+        onLocaleChange={setLocale}
+        languageLabel={t.switchLabel}
+        theme={theme}
+        onThemeChange={setTheme}
+        themeLabel={t.themeLabel}
+        themeOptions={t.theme}
+        donateLabel={t.pix.button}
+        onDonate={() => setDonationOpen(true)}
+      />
+      <DonationSupport locale={locale} open={donationOpen} onClose={() => setDonationOpen(false)} />
       <section className="hero-section">
         <div className="hero-copy">
           <p className="eyebrow">{t.hero.eyebrow}</p>
           <h1>{t.hero.title}</h1>
           <p className="hero-text">{t.hero.text}</p>
+          <InstallCommands locale={locale} />
           <div className="hero-actions"><a className="button primary" href="#playground">{t.hero.primary}</a><a className="button secondary" href="#benchmark">{t.hero.secondary}</a></div>
           <div className="stats" aria-label="Maskarajs">{t.hero.stats.map(([title, text]) => <div key={title}><strong>{title}</strong><span>{text}</span></div>)}</div>
         </div>
@@ -1123,9 +1297,10 @@ function App() {
       <Playground locale={locale} presets={presets} />
       <CustomLab locale={locale} />
       <ExampleGallery locale={locale} examples={examples} />
-      <WhyMaskSection locale={locale} />
+      <section className="docs-section" id="implementacao"><SectionHeading eyebrow={t.docs.eyebrow} title={t.docs.title} text={t.docs.text} /><div className="implementation"><div className="tabs" role="tablist" aria-label="Frameworks">{(['React', 'Vue', 'Angular', 'React Native', 'Vanilla'] as Framework[]).map((item) => <button key={item} type="button" role="tab" aria-selected={framework === item} onClick={() => setFramework(item)}>{item}</button>)}</div><CodeBlock code={snippets[framework]} /></div></section>
+      <ReactFormsSection locale={locale} />
       <section className="recipes-section" id="receitas"><SectionHeading eyebrow={t.recipes.eyebrow} title={t.recipes.title} text={t.recipes.text} /><div className="recipes-grid"><ValidateDemo locale={locale} /><CustomSlotsDemo locale={locale} /><DefineDemo locale={locale} /><CreateDemo locale={locale} /></div></section>
-      <section className="docs-section" id="implementacao"><SectionHeading eyebrow={t.docs.eyebrow} title={t.docs.title} text={t.docs.text} /><div className="implementation"><div className="tabs" role="tablist" aria-label="Frameworks">{(['React', 'Vue', 'Vanilla'] as Framework[]).map((item) => <button key={item} type="button" role="tab" aria-selected={framework === item} onClick={() => setFramework(item)}>{item}</button>)}</div><CodeBlock code={snippets[framework]} /></div></section>
+      <WhyMaskSection locale={locale} />
       <BenchmarkSection locale={locale} />
       <ApiDocsSection locale={locale} />
       <section className="final-section"><div><span>{t.final.eyebrow}</span><h2>{t.final.title}</h2></div><CodeBlock className="footer-code" code="npm install maskarajs" /></section>

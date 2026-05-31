@@ -317,3 +317,86 @@ for (let i = 0; i < iterations; i++) {
 ## License
 
 MIT
+
+## React hook
+
+`maskarajs/react` exports a small `useMask` hook. It lives in a separate entrypoint, so the core package stays framework-agnostic for users who do not use React.
+
+```tsx
+import { useMask } from 'maskarajs/react'
+
+export function CPFField() {
+  const cpf = useMask('###[.]###[.]###[-]##')
+
+  return <input {...cpf.inputProps({ inputMode: 'numeric' })} />
+}
+```
+
+### React Hook Form
+
+Use `onValue` to send the raw value to React Hook Form while the input keeps the masked value on screen.
+
+```tsx
+import { Controller, useForm } from 'react-hook-form'
+import { useMask } from 'maskarajs/react'
+
+type FormValues = {
+  cpf: string
+}
+
+function CPFController({ field }) {
+  const cpf = useMask('###[.]###[.]###[-]##', {
+    value: field.value,
+    onValue: field.onChange,
+  })
+
+  return (
+    <input
+      {...cpf.inputProps({
+        name: field.name,
+        onBlur: field.onBlur,
+        ref: field.ref,
+        inputMode: 'numeric',
+      })}
+    />
+  )
+}
+
+export function Form() {
+  const { control, handleSubmit } = useForm<FormValues>({
+    defaultValues: { cpf: '' },
+  })
+
+  return (
+    <form onSubmit={handleSubmit(console.log)}>
+      <Controller
+        name="cpf"
+        control={control}
+        render={({ field }) => <CPFController field={field} />}
+      />
+    </form>
+  )
+}
+```
+
+### Zod
+
+Keep the form value raw and validate it normally.
+
+```ts
+import { z } from 'zod'
+
+export const schema = z.object({
+  cpf: z.string().length(11, 'CPF must contain 11 digits'),
+})
+```
+
+### Yup
+
+```ts
+import * as yup from 'yup'
+
+export const schema = yup.object({
+  cpf: yup.string().length(11, 'CPF must contain 11 digits').required(),
+})
+```

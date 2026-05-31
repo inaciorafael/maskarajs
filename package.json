@@ -10,15 +10,32 @@
       "import": "./mask.mjs",
       "require": "./mask.cjs.js",
       "types": "./mask.d.ts"
+    },
+    "./react": {
+      "import": "./react.mjs",
+      "require": "./react.cjs.js",
+      "types": "./react.d.ts"
     }
   },
   "files": [
+    "src",
     "mask.js",
     "mask.mjs",
     "mask.cjs.js",
     "mask.d.ts",
+    "react.mjs",
+    "react.cjs.js",
+    "react.d.ts",
     "README.md"
   ],
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
   "sideEffects": false,
   "keywords": [
     "mask", "input-mask", "form", "cpf", "cnpj", "phone",
