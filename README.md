@@ -1,91 +1,99 @@
-# mask.js
+# maskarajs
 
-Engine de máscaras declarativo para JavaScript — framework-agnostic, zero dependências, ~4kb.
+Declarative input mask engine for JavaScript. Framework-agnostic, zero dependencies, and small enough to live close to your form fields.
 
-## Sintaxe
+## Syntax
 
-| Token | Aceita |
+| Token | Accepts |
 |---|---|
-| `#` | qualquer dígito (0–9) |
-| `@` | qualquer letra (a–z, A–Z, acentuados) |
-| `*` | qualquer caractere |
-| `[texto]` | literal fixo (inserido/removido automaticamente) |
-| `{expr}` | slot livre — testa um char contra a expressão |
+| `#` | any digit (`0-9`) |
+| `@` | any letter (`a-z`, `A-Z`, accented letters) |
+| `*` | any character |
+| `[text]` | fixed literal text, inserted and removed automatically |
+| `{expr}` | free slot: tests one character against an expression |
 
-### Modificador `{expr}`
+### `{expr}` modifier
 
+```txt
+{4}         -> only the char "4"
+{0-4}       -> range: ch >= "0" && ch <= "4"
+{013}       -> set: "0", "1" or "3"
+{[0-9a-f]}  -> regex: any hexadecimal char
+{\d}        -> regex: any digit
+{[^aeiou]}  -> regex: any consonant
 ```
-{4}         → só o char '4'
-{0-4}       → intervalo: ch >= '0' && ch <= '4'
-{013}       → conjunto: '0', '1' ou '3'
-{[0-9a-f]}  → regex: qualquer char hex
-{\d}        → regex: qualquer dígito
-{[^aeiou]}  → regex: consoante
+
+## Install
+
+```bash
+npm install maskarajs
+```
+
+```js
+import mask from 'maskarajs'
 ```
 
 ## API
 
 ```js
-import mask from './mask.js'
-
-mask(pattern, value)               // aplica máscara → string formatada
-mask.raw(pattern, value)           // valor limpo / resultado do transform
-mask.is(pattern, value)            // padrão completo? → boolean
-mask.hint(pattern)                 // placeholder → string
-mask.format(pattern, value)        // alias semântico de mask()
-mask.rawLength(pattern, value)     // chars de input preenchidos → number
-mask.patternLength(pattern)        // tamanho mascarado completo → number
-mask.define(name, definition)      // registra máscara nomeada
-mask.undefine(name)                // remove do registry
-mask.names()                       // lista nomes registrados → string[]
-mask.defineSlot(symbol, definition)// cria/sobrescreve token de input
-mask.undefineSlot(symbol)          // remove token customizado
-mask.slots()                       // lista tokens de input disponíveis
-mask.on(input, pattern, options)   // vincula a input DOM → cleanup()
-mask.create(presets)               // instância isolada com registry próprio
+mask(pattern, value)                // apply mask -> formatted string
+mask.raw(pattern, value)            // clean value / transform result
+mask.is(pattern, value)             // complete pattern? -> boolean
+mask.hint(pattern)                  // readable placeholder -> string
+mask.format(pattern, value)         // semantic alias for mask()
+mask.rawLength(pattern, value)      // filled input chars -> number
+mask.patternLength(pattern)         // full formatted length -> number
+mask.define(name, definition)       // register a named mask
+mask.undefine(name)                 // remove a named mask
+mask.names()                        // list registered names -> string[]
+mask.defineSlot(symbol, definition) // create or override an input token
+mask.undefineSlot(symbol)           // remove a custom token
+mask.slots()                        // list available input tokens
+mask.on(input, pattern, options)    // bind to a DOM input -> cleanup()
+mask.create(presets)                // isolated instance with its own registry
 ```
 
-## Exemplos
+## Examples
 
 ```js
-// Padrão único
+// Single pattern
 mask('###[.]###[.]###[-]##', '12345678909')
-// → '123.456.789-09'
+// -> '123.456.789-09'
 
-// Padrão dinâmico (array) — escolhe pelo tamanho do input
+// Dynamic pattern array: chooses by input size
 mask(['[(]##[)] ####[-]####', '[(]##[)] #####[-]####'], '11987654321')
-// → '(11) 98765-4321'
+// -> '(11) 98765-4321'
 
-// Slot com restrição
+// Restricted slot
 mask('{4}### #### #### ####', '4111111111111111')
-// → '4111 1111 1111 1111'  (só aceita Visa — começa com 4)
+// -> '4111 1111 1111 1111'
 
-// Slot com regex
+// Regex slot
 mask('{[0-9a-fA-F]}{[0-9a-fA-F]}{[0-9a-fA-F]}{[0-9a-fA-F]}{[0-9a-fA-F]}{[0-9a-fA-F]}', '1a2b3c')
-// → '1a2b3c'
+// -> '1a2b3c'
 ```
 
-### Mais casos comuns
+### Common cases
 
 ```js
-// CEP
+// Brazilian ZIP code
 mask('#####[-]###', '01310930')
-// → '01310-930'
+// -> '01310-930'
 
 // CNPJ
 mask('##[.]###[.]###[/]####[-]##', '11222333000181')
-// → '11.222.333/0001-81'
+// -> '11.222.333/0001-81'
 
-// Cartão Visa
+// Visa card
 mask('{4}### #### #### ####', '5111111111111111')
-// → ''  (primeiro char não passou)
+// -> ''  (the first char did not pass)
 
-// Hex color com paste sujo
+// Hex color with dirty paste
 mask('{[0-9a-fA-F]}{[0-9a-fA-F]}{[0-9a-fA-F]}{[0-9a-fA-F]}{[0-9a-fA-F]}{[0-9a-fA-F]}', '1z2b3c')
-// → '12b3c'
+// -> '12b3c'
 ```
 
-## mask.define — com transform
+## `mask.define` with `transform`
 
 ```js
 mask.define('date', {
@@ -102,20 +110,18 @@ mask.define('date', {
   },
 })
 
-mask('date', '01012025')          // → '01/01/2025'
-mask.raw('date', '01/01/2025')    // → Date(2025-01-01)
-mask.raw('date', '01/01')         // → null  (incompleto — transform decidiu)
-mask.is('date', '01/01/2025')     // → true
-mask.hint('date')                 // → '00/00/0000'
-mask.rawLength('date', '01/01')   // → 4
-mask.patternLength('date')        // → 10
+mask('date', '01012025')          // -> '01/01/2025'
+mask.raw('date', '01/01/2025')    // -> Date(2025-01-01)
+mask.raw('date', '01/01')         // -> null
+mask.is('date', '01/01/2025')     // -> true
+mask.hint('date')                 // -> '00/00/0000'
+mask.rawLength('date', '01/01')   // -> 4
+mask.patternLength('date')        // -> 10
 ```
 
-## validate — validação incremental
+## `validate`: incremental validation
 
-Use `validate` em máscaras nomeadas quando a regra depende do que já foi digitado.
-Isso resolve casos onde a sintaxe caractere a caractere não é suficiente, como mês
-entre `01` e `12`.
+Use `validate` on named masks when the rule depends on what has already been typed. This covers cases where character-by-character syntax is not enough, such as accepting only months from `01` to `12`.
 
 ```js
 mask.define('month', {
@@ -127,17 +133,15 @@ mask.define('month', {
   },
 })
 
-mask('month', '12') // → '12'
-mask('month', '19') // → '1'  (o 9 é recusado)
-mask.is('month', '12') // → true
-mask.is('month', '19') // → false
+mask('month', '12') // -> '12'
+mask('month', '19') // -> '1'
+mask.is('month', '12') // -> true
+mask.is('month', '19') // -> false
 ```
 
-## Slots customizados — sua própria linguagem de pattern
+## Custom slots: create your own pattern language
 
-Além de `#`, `@`, `*` e `{expr}`, você pode criar símbolos que façam sentido
-para o seu time. Isso ajuda quando o projeto quer uma linguagem mais expressiva,
-mais curta ou alinhada ao domínio do produto.
+Besides `#`, `@`, `*` and `{expr}`, you can create symbols that make sense for your team. This is useful when a project needs a shorter, more expressive language aligned with its product domain.
 
 ```js
 mask.defineSlot('N', {
@@ -145,23 +149,22 @@ mask.defineSlot('N', {
   hint: '0',
 })
 
-mask('NNN[-]NN', '12345') // → '123-45'
-mask.hint('NNN[-]NN')     // → '000-00'
-mask.slots()              // → ['#', '@', '*', 'N']
+mask('NNN[-]NN', '12345') // -> '123-45'
+mask.hint('NNN[-]NN')     // -> '000-00'
+mask.slots()              // -> ['#', '@', '*', 'N']
 ```
 
-Você também pode passar uma `RegExp` direta ou apenas uma função:
+You can also pass a `RegExp` or a function directly:
 
 ```js
 mask.defineSlot('H', /[0-9a-f]/i)
 mask.defineSlot('V', ch => 'AEIOUaeiou'.includes(ch))
 
-mask('HHHHHH', '1a2b3c') // → '1a2b3c'
-mask('VVV', 'mask')      // → 'a'
+mask('HHHHHH', '1a2b3c') // -> '1a2b3c'
+mask('VVV', 'mask')      // -> 'a'
 ```
 
-O registro global afeta o engine global. Para bibliotecas, design systems ou
-produtos com regras próprias, prefira uma instância isolada:
+Global slots affect the global engine. For libraries, design systems or products with their own rules, prefer an isolated instance:
 
 ```js
 const forge = mask.create()
@@ -169,42 +172,41 @@ const forge = mask.create()
 forge.defineSlot('N', { test: ch => /\d/.test(ch), hint: '0' })
 forge.defineSlot('#', { test: ch => /[1-9]/.test(ch), hint: '1' })
 
-forge('NNN[-]NN', '12345') // → '123-45'
-forge('#', '0')            // → ''   (# foi sobrescrito nesta instância)
-mask('#', '0')             // → '0'  (global continua igual)
+forge('NNN[-]NN', '12345') // -> '123-45'
+forge('#', '0')            // -> ''
+mask('#', '0')             // -> '0'  (global stays unchanged)
 ```
 
-Se um símbolo registrado precisar aparecer como texto fixo, escape com
-colchetes:
+If a registered symbol must appear as fixed text, escape it with brackets:
 
 ```js
 mask.defineSlot('N', /\d/)
 
-mask('[N]##', '45') // → 'N45'
-mask('N##', '145')  // → '145'
+mask('[N]##', '45') // -> 'N45'
+mask('N##', '145')  // -> '145'
 ```
 
-## mask.on — qualquer framework
+## `mask.on`: any framework
 
 ```js
 // Vanilla JS
 const off = mask.on(inputEl, 'cpf', {
-  onValue:  raw    => setState(raw),
+  onValue: raw => setState(raw),
   onMasked: masked => setLabel(masked),
 })
-off() // remove listeners
+off()
 
 // React
 useEffect(() => {
   return mask.on(ref.current, 'date', {
-    onValue: (date) => setValue(date), // Date | null
+    onValue: date => setValue(date), // Date | null
   })
 }, [])
 
 // Vue
 onMounted(() => {
   mask.on(inputRef.value, 'phone', {
-    onValue: v => emit('update:modelValue', v),
+    onValue: value => emit('update:modelValue', value),
   })
 })
 
@@ -215,7 +217,7 @@ function maskAction(node, pattern) {
 }
 ```
 
-## mask.create — instâncias isoladas
+## `mask.create`: isolated instances
 
 ```js
 export const maskBR = mask.create({
@@ -231,10 +233,6 @@ export const maskBR = mask.create({
       return isNaN(dt) ? null : dt
     },
   },
-  money: {
-    pattern: '########[,]##',
-    transform: raw => parseInt(raw || '0', 10) / 100,
-  },
 })
 
 export const maskUS = mask.create({
@@ -243,41 +241,40 @@ export const maskUS = mask.create({
   phone: { pattern: '[(]###[)] ###[-]####' },
 })
 
-// Mesma API, registries isolados — alterações em maskBR não afetam maskUS
-maskBR('cpf', '12345678909')          // → '123.456.789-09'
-maskBR.raw('date', '01/01/2025')      // → Date
-maskBR.names()                         // → ['cpf', 'cnpj', 'phone', 'cep', 'date', 'money']
-maskUS.names()                         // → ['ssn', 'zip', 'phone']
+maskBR('cpf', '12345678909')     // -> '123.456.789-09'
+maskBR.raw('date', '01/01/2025') // -> Date
+maskBR.names()                   // -> ['cpf', 'cnpj', 'phone', 'cep', 'date']
+maskUS.names()                   // -> ['ssn', 'zip', 'phone']
 ```
 
-## rawLength e patternLength
+## `rawLength` and `patternLength`
 
 ```js
-const filled = mask.rawLength('cpf', value)   // chars preenchidos (sem literais)
-const total  = mask.patternLength('cpf')       // tamanho total mascarado
+const filled = mask.rawLength('cpf', value)
+const total = mask.patternLength('cpf')
 
-const pct    = mask('cpf', value).length / total * 100
-const ready  = mask.is('cpf', value)           // habilita submit
-const label  = `${filled} raw chars`           // "7 raw chars"
+const pct = mask('cpf', value).length / total * 100
+const ready = mask.is('cpf', value)
+const label = `${filled} raw chars`
 ```
 
-`patternLength` conta o tamanho final mascarado, incluindo literais. Exemplos:
+`patternLength` counts the final formatted length, including literals:
 
 ```js
-mask.patternLength('##[/]##[/]####')       // → 10
-mask.patternLength('###[.]###[.]###[-]##') // → 14
-mask.patternLength('{4}### #### #### ####') // → 19
+mask.patternLength('##[/]##[/]####')       // -> 10
+mask.patternLength('###[.]###[.]###[-]##') // -> 14
+mask.patternLength('{4}### #### #### ####') // -> 19
 ```
 
-## Showcase visual
+## Visual showcase
 
-O projeto `maskforge-showcase` demonstra a lib com:
+The `maskforge-showcase` project demonstrates the library with:
 
-- playground destacado com máscara aplicada enquanto o usuário digita;
-- visualização do pattern em blocos: slot, literal e expressão;
-- exemplos para React, Vue e Vanilla;
-- receitas interativas para `validate`, `define` e `create`;
-- análise de benchmark local.
+- a playground that applies the mask while the user types;
+- a visual pattern map with slot, literal and expression blocks;
+- examples for React, Vue and Vanilla JavaScript;
+- interactive recipes for `validate`, `define`, `defineSlot` and `create`;
+- local benchmark notes.
 
 ```bash
 cd maskforge-showcase
@@ -285,17 +282,16 @@ npm install
 npm run dev
 ```
 
-## Benchmark local
+## Local benchmark
 
-Benchmark simples rodado em Node/WSL com 200.000 iterações por caso após warmup.
-Os valores variam por máquina, mas ajudam a orientar expectativas de uso em input.
+Simple benchmark executed in Node/WSL with 200,000 iterations per case after warmup. Numbers vary by machine, but they help set expectations for input-level usage.
 
-| Caso | Resultado |
+| Case | Result |
 |---|---:|
-| CPF format | 39.705 ops/s |
-| Phone dynamic | 32.455 ops/s |
-| Date validate | 64.572 ops/s |
-| Raw extraction | 44.729 ops/s |
+| CPF format | 39,705 ops/s |
+| Phone dynamic | 32,455 ops/s |
+| Date validate | 64,572 ops/s |
+| Raw extraction | 44,729 ops/s |
 
 ```js
 const iterations = 200000
@@ -304,35 +300,20 @@ for (let i = 0; i < iterations; i++) {
 }
 ```
 
-## transform — contrato
+## `transform` contract
 
 ```js
 // transform(raw, masked, complete) => T
 // validate(raw, masked, complete) => boolean
 //
-// raw      → string com os chars de input sem literais
-// masked   → string formatada com a máscara
-// complete → true quando todos os slots estão preenchidos
+// raw      -> input chars without literals
+// masked   -> formatted string
+// complete -> true when every slot is filled
 //
-// Sem transform → mask.raw() retorna string crua, sempre
-// Com transform → mask.raw() retorna o que transform devolver, sempre
-//   O transform decide o que fazer com input parcial
-
-mask.define('money', {
-  pattern: '########[,]##',
-  transform: raw => parseInt(raw || '0', 10) / 100,
-  // retorna number sempre — mesmo parcial
-})
-
-mask.define('date', {
-  pattern: '##[/]##[/]####',
-  transform: (raw, masked, complete) => {
-    if (!complete) return null  // null enquanto incompleto
-    return new Date(...)        // Date quando completo
-  },
-})
+// Without transform -> mask.raw() always returns the raw string
+// With transform    -> mask.raw() always returns whatever transform returns
 ```
 
-## Licença
+## License
 
 MIT

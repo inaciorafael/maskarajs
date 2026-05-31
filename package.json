@@ -1,19 +1,20 @@
 {
-  "name": "maskjs",
+  "name": "maskarajs",
   "version": "1.0.0",
   "description": "Engine de máscaras declarativo — framework-agnostic, zero dependências, ~4kb",
   "main": "./mask.cjs.js",
-  "module": "./mask.js",
+  "module": "./mask.mjs",
   "types": "./mask.d.ts",
   "exports": {
     ".": {
-      "import": "./mask.js",
+      "import": "./mask.mjs",
       "require": "./mask.cjs.js",
       "types": "./mask.d.ts"
     }
   },
   "files": [
     "mask.js",
+    "mask.mjs",
     "mask.cjs.js",
     "mask.d.ts",
     "README.md"
