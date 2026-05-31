@@ -53,6 +53,47 @@ mask.on(input, pattern, options)    // bind to a DOM input -> cleanup()
 mask.create(presets)                // isolated instance with its own registry
 ```
 
+## React adapter
+
+The React adapter is optional and lives in `maskarajs/react`. Use `useMask` directly for small forms, or wrap your app with `MaskProvider` when you have an isolated engine created with `mask.create()`.
+
+```tsx
+import mask from 'maskarajs'
+import { MaskProvider, useMask } from 'maskarajs/react'
+
+const appMask = mask.create({
+  cpf: { pattern: '###[.]###[.]###[-]##' },
+  phone: { pattern: ['[(]##[)] ####[-]####', '[(]##[)] #####[-]####'] },
+})
+
+function CPFInput() {
+  const cpf = useMask('cpf')
+
+  return (
+    <input
+      {...cpf.inputProps({ inputMode: 'numeric' })}
+      aria-label="CPF"
+    />
+  )
+}
+
+export function App() {
+  return (
+    <MaskProvider engine={appMask}>
+      <CPFInput />
+    </MaskProvider>
+  )
+}
+```
+
+`useMask` still accepts an `engine` option when a single field needs a specific instance:
+
+```tsx
+const cpf = useMask('cpf', { engine: appMask })
+```
+
+The hook stores field state. The engine stores mask configuration.
+
 ## Examples
 
 ```js
@@ -246,6 +287,36 @@ maskBR.raw('date', '01/01/2025') // -> Date
 maskBR.names()                   // -> ['cpf', 'cnpj', 'phone', 'cep', 'date']
 maskUS.names()                   // -> ['ssn', 'zip', 'phone']
 ```
+
+## Official Brazilian presets
+
+If you want common Brazilian masks ready to use, import `maskarajs/presets/br` and create an isolated engine from it.
+
+```ts
+import mask from 'maskarajs'
+import { br, type BrazilPresetRegistry } from 'maskarajs/presets/br'
+
+const maskBR = mask.create<BrazilPresetRegistry>(br)
+
+maskBR('cpf', '12345678909')      // -> '123.456.789-09'
+maskBR('cnpj', '11222333000181')  // -> '11.222.333/0001-81'
+maskBR('phone', '11987654321')    // -> '(11) 98765-4321'
+maskBR.raw('cep', '01310-930')    // -> '01310930'
+maskBR.raw('date', '01/12/2025')  // -> Date
+maskBR.raw('money', '1299,90')    // -> 1299.9
+```
+
+The preset includes:
+
+| Name | Pattern / behavior |
+|---|---|
+| `cpf` | `000.000.000-00` |
+| `cnpj` | `00.000.000/0000-00` |
+| `cep` | `00000-000`, returns `null` until complete |
+| `phone` | landline or mobile phone |
+| `date` | `DD/MM/YYYY`, rejects invalid months and returns `Date \| null` |
+| `month` | accepts only `01` to `12` |
+| `money` | decimal money value from cents |
 
 ## `rawLength` and `patternLength`
 

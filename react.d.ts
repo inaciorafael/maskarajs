@@ -1,4 +1,4 @@
-import type { ChangeEvent, InputHTMLAttributes } from 'react'
+import type { ChangeEvent, InputHTMLAttributes, ReactNode } from 'react'
 import type { MaskInstance, MaskPattern } from './mask'
 
 export type MaskInputChange = ChangeEvent<HTMLInputElement> | string | number | null | undefined
@@ -27,6 +27,15 @@ export interface UseMaskResult<T = string> {
     }
   ) => InputHTMLAttributes<HTMLInputElement>
 }
+
+export interface MaskProviderProps {
+  engine?: MaskInstance | typeof import('./mask').default
+  children?: ReactNode
+}
+
+export declare function MaskProvider(props: MaskProviderProps): ReactNode
+
+export declare function useMaskEngine(): MaskInstance | typeof import('./mask').default
 
 export declare function useMask<T = string>(
   pattern: MaskPattern,

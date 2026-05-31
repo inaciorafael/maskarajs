@@ -1,8 +1,6 @@
 export type Locale = 'pt-BR' | 'en'
 export type Theme = 'light' | 'dark'
 
-import Logo from '../assets/logo.png'
-
 type TopNavProps = {
   locale: Locale
   onLocaleChange: (locale: Locale) => void

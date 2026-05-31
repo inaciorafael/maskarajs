@@ -1,5 +1,7 @@
-import { useCallback, useMemo, useState } from 'react'
+import { createContext, createElement, useCallback, useContext, useMemo, useState } from 'react'
 import mask from '../../mask.mjs'
+
+const MaskEngineContext = createContext(mask)
 
 function readInputValue(eventOrValue) {
   if (eventOrValue && typeof eventOrValue === 'object' && 'target' in eventOrValue) {
@@ -9,7 +11,8 @@ function readInputValue(eventOrValue) {
 }
 
 export function useMask(pattern, options = {}) {
-  const engine = options.engine ?? mask
+  const contextEngine = useContext(MaskEngineContext)
+  const engine = options.engine ?? contextEngine
   const hasControlledValue = Object.prototype.hasOwnProperty.call(options, 'value')
   const [internalValue, setInternalValue] = useState(() => engine(pattern, options.defaultValue ?? ''))
   const sourceValue = hasControlledValue ? options.value : internalValue
@@ -58,6 +61,14 @@ export function useMask(pattern, options = {}) {
     reset,
     inputProps,
   }
+}
+
+export function useMaskEngine() {
+  return useContext(MaskEngineContext)
+}
+
+export function MaskProvider({ engine, children }) {
+  return createElement(MaskEngineContext.Provider, { value: engine ?? mask }, children)
 }
 
 export default useMask

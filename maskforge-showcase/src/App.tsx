@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import mask from '../../mask.js'
 import { DonationSupport } from './components/DonationSupport'
 import { TopNav, type Locale, type Theme } from './components/TopNav'
+import mascotLogo from './assets/logo-hero.png'
 import './App.css'
 
 type Framework = 'React' | 'Vue' | 'Angular' | 'React Native' | 'Vanilla'
@@ -29,6 +30,16 @@ type HookExample = {
   description: string
   code?: string
   soon?: boolean
+}
+
+type DocumentationTopic = {
+  id: string
+  menu: string
+  eyebrow: string
+  title: string
+  description: string
+  bullets: string[]
+  code: string
 }
 
 const namedPatterns: Record<string, string | string[]> = {
@@ -233,17 +244,29 @@ const off = mask.on(input, [
 }
 
 const codeSnippets = {
-  reactHook: `import { useMask } from 'maskarajs/react'
+  reactHook: `import mask from 'maskarajs'
+import { MaskProvider, useMask } from 'maskarajs/react'
 
-const cpfPattern = '###[.]###[.]###[-]##'
+const appMask = mask.create({
+  cpf: { pattern: '###[.]###[.]###[-]##' },
+  phone: { pattern: ['[(]##[)] ####[-]####', '[(]##[)] #####[-]####'] },
+})
 
 export function CPFInput() {
-  const cpf = useMask(cpfPattern)
+  const cpf = useMask('cpf')
 
   return (
     <input
       {...cpf.inputProps({ inputMode: 'numeric' })}
     />
+  )
+}
+
+export function App() {
+  return (
+    <MaskProvider engine={appMask}>
+      <CPFInput />
+    </MaskProvider>
   )
 }`,
   validate: `mask.define('month', {
@@ -289,6 +312,19 @@ mask('NNN[-]NN', '12345') // '123-45'
 const forge = mask.create()
 forge.defineSlot('H', /[0-9a-f]/i)
 forge.defineSlot('V', ch => 'AEIOUaeiou'.includes(ch))`,
+  brPresets: `import mask from 'maskarajs'
+import { br, type BrazilPresetRegistry } from 'maskarajs/presets/br'
+
+const maskBR = mask.create<BrazilPresetRegistry>(br)
+
+maskBR('cpf', '12345678909')
+// '123.456.789-09'
+
+maskBR('phone', '11987654321')
+// '(11) 98765-4321'
+
+maskBR.raw('date', '01/12/2025')
+// Date`,
 }
 
 const content = {
@@ -405,7 +441,7 @@ const content = {
     reactForms: {
       eyebrow: 'React forms',
       title: 'Quando quiser conveniencia no React, use o hook pronto.',
-      text: 'O hook fica em maskarajs/react e entrega o que um input controlado precisa: value, onChange, raw, complete e inputProps.',
+      text: 'O adapter React agora tambem tem MaskProvider: configure uma instancia uma vez e use useMask nos campos sem repetir engine em todo componente.',
       soon: 'Em breve',
       cards: [
         ['useMask', 'O caminho curto para inputs React controlados, mantendo masked na tela e raw disponivel no retorno.'],
@@ -561,7 +597,7 @@ const content = {
     reactForms: {
       eyebrow: 'React forms',
       title: 'When you want React convenience, use the ready hook.',
-      text: 'The hook lives in maskarajs/react and gives a controlled input what it needs: value, onChange, raw, complete, and inputProps.',
+      text: 'The React adapter now also has MaskProvider: configure an instance once and call useMask in fields without repeating engine in every component.',
       soon: 'Coming soon',
       cards: [
         ['useMask', 'The shortest path for controlled React inputs, keeping masked on screen and raw in the returned object.'],
@@ -700,19 +736,6 @@ function buildExamples(locale: Locale): Example[] {
   ]
 }
 
-function buildApiRows(locale: Locale) {
-  const pt = locale === 'pt-BR'
-  return [
-    ['Format', 'mask(pattern, value)', pt ? 'A funcao que voce chama no render, no paste ou antes de mostrar dados vindos da API.' : 'The function you call on render, paste, or before showing API data.', `mask('###[.]###[.]###[-]##', '12345678909')\n// '123.456.789-09'`, 'format'],
-    ['Raw', 'mask.raw(pattern, value)', pt ? 'Pegue o que importa para salvar: sem pontos, barras ou ruido visual.' : 'Get what matters for storage: no dots, slashes, or visual noise.', `mask.raw('cpf', '123.456.789-09')\n// '12345678909'`, 'raw'],
-    ['Guard', 'validate(raw, masked, complete)', pt ? 'Para regras que regex de slot nao resolve sozinha, como mes valido e ranges contextuais.' : 'For rules a slot regex cannot solve alone, such as valid months and contextual ranges.', `mask.define('month', {\n  pattern: '{0-1}#',\n  validate: (raw, _, complete) => !complete || Number(raw) <= 12,\n})`, 'guard'],
-    ['Ready', 'mask.is(pattern, value)', pt ? 'Uma checagem direta para liberar submit ou manter o fluxo em progresso.' : 'A direct check to enable submit or keep the flow in progress.', `mask.is('##[/]##[/]####', '01/01/2025')\n// true`, 'ready'],
-    ['Measure', 'mask.patternLength(pattern)', pt ? 'Mede o formato final, incluindo literais. Perfeito para feedback visual.' : 'Measures the final format, including literals. Great for visual progress.', `mask.patternLength('##[/]##[/]####')\n// 10`, 'measure'],
-    ['Registry', 'mask.create(presets)', pt ? 'Organize presets por pais, produto ou dominio sem espalhar estado global.' : 'Organize presets by country, product, or domain without spreading global state.', `const maskBR = mask.create({\n  cpf: { pattern: '###[.]###[.]###[-]##' },\n})`, 'registry'],
-    ['Language', 'mask.defineSlot(symbol, definition)', pt ? 'Ensine a engine a falar a linguagem do seu time: N, H, V ou qualquer regra curta.' : 'Teach the engine your team language: N, H, V, or any short rule.', `mask.defineSlot('N', { test: ch => /\\d/.test(ch), hint: '0' })\nmask('NNN[-]NN', '12345')\n// '123-45'`, 'language'],
-  ] as const
-}
-
 function buildHookExamples(locale: Locale): HookExample[] {
   const t = content[locale].reactForms
   return [
@@ -743,6 +766,179 @@ function buildHookExamples(locale: Locale): HookExample[] {
   ]
 }
 
+function buildDocumentation(locale: Locale): DocumentationTopic[] {
+  const pt = locale === 'pt-BR'
+  return [
+    {
+      id: 'quick-start',
+      menu: pt ? 'Comeco rapido' : 'Quick start',
+      eyebrow: 'mask()',
+      title: pt ? 'Aplique mascara sem criar um componente novo.' : 'Apply a mask without creating a new component.',
+      description: pt ? 'A funcao principal recebe um pattern ou nome registrado e devolve a string pronta para exibir no input.' : 'The main function receives a pattern or registered name and returns the display string for the input.',
+      bullets: pt
+        ? ['Use direto no onChange, paste ou ao renderizar dados da API.', 'A mesma chamada funciona em React, Vue, Angular, React Native e Vanilla.', 'O valor de tela fica separado do valor limpo.']
+        : ['Use it on change, paste, or when rendering API data.', 'The same call works in React, Vue, Angular, React Native, and Vanilla.', 'Display value stays separate from clean value.'],
+      code: `import mask from 'maskarajs'
+
+const cpf = '###[.]###[.]###[-]##'
+
+mask(cpf, '12345678909')
+// '123.456.789-09'
+
+mask.raw(cpf, '123.456.789-09')
+// '12345678909'`,
+    },
+    {
+      id: 'patterns',
+      menu: 'Patterns',
+      eyebrow: '# @ * [] {}',
+      title: pt ? 'A linguagem do pattern cobre slots, literais e restricoes.' : 'The pattern language covers slots, literals, and restrictions.',
+      description: pt ? 'Patterns sao pequenos por design: voce combina tokens de entrada, texto fixo e expressoes por caractere.' : 'Patterns are small by design: combine input tokens, fixed text, and per-character expressions.',
+      bullets: pt
+        ? ['# aceita digitos, @ aceita letras e * aceita qualquer caractere.', '[texto] vira literal fixo e e removido do raw automaticamente.', '{expr} restringe um caractere com range, conjunto ou regex.']
+        : ['# accepts digits, @ accepts letters, and * accepts any character.', '[text] becomes fixed literal text and is removed from raw automatically.', '{expr} restricts one character with a range, set, or regex.'],
+      code: `mask('##[/]##[/]####', '01012025')
+// '01/01/2025'
+
+mask('{4}### #### #### ####', '4111111111111111')
+// '4111 1111 1111 1111'
+
+mask('{[0-9a-fA-F]}{[0-9a-fA-F]}{[0-9a-fA-F]}', '1z2')
+// '12'`,
+    },
+    {
+      id: 'registered',
+      menu: pt ? 'Mascaras nomeadas' : 'Named masks',
+      eyebrow: 'define()',
+      title: pt ? 'Dê nome para regras que aparecem em varios campos.' : 'Name rules that appear in multiple fields.',
+      description: pt ? 'Com define, seu produto passa a falar cpf, date, money ou qualquer nome do seu dominio.' : 'With define, your product can speak cpf, date, money, or any name from your domain.',
+      bullets: pt
+        ? ['Evita repetir patterns longos em varios componentes.', 'Centraliza validate e transform junto da mascara.', 'Funciona no registry global ou dentro de uma instancia.']
+        : ['Avoid repeating long patterns across components.', 'Keep validate and transform close to the mask.', 'Works globally or inside an isolated instance.'],
+      code: `mask.define('date', {
+  pattern: '##[/]{0-1}#[/]####',
+  validate: raw => raw.length < 4 || Number(raw.slice(2, 4)) <= 12,
+})
+
+mask('date', '01122025')
+// '01/12/2025'`,
+    },
+    {
+      id: 'transform',
+      menu: 'Validate + transform',
+      eyebrow: 'validate()',
+      title: pt ? 'Valide contexto e devolva o tipo certo para o app.' : 'Validate context and return the right type to your app.',
+      description: pt ? 'O pattern filtra caracteres; validate fecha regras contextuais; transform converte raw para Date, number, null ou outro tipo.' : 'The pattern filters characters; validate handles contextual rules; transform converts raw into Date, number, null, or another type.',
+      bullets: pt
+        ? ['Bloqueie meses como 19 sem criar handler especial no input.', 'Use complete para decidir quando transformar.', 'raw() devolve o resultado do transform quando ele existe.']
+        : ['Block months like 19 without a custom input handler.', 'Use complete to decide when to transform.', 'raw() returns the transform result when one exists.'],
+      code: `mask.define('money', {
+  pattern: '########[,]##',
+  transform: raw => Number.parseInt(raw || '0', 10) / 100,
+})
+
+mask('money', '129990')
+// '1299,90'
+
+mask.raw('money', '1299,90')
+// 1299.9`,
+    },
+    {
+      id: 'slots',
+      menu: pt ? 'Slots custom' : 'Custom slots',
+      eyebrow: 'defineSlot()',
+      title: pt ? 'Crie uma linguagem curta para o seu time.' : 'Create a compact language for your team.',
+      description: pt ? 'Slots customizados deixam patterns mais expressivos quando seu produto tem simbolos recorrentes.' : 'Custom slots make patterns more expressive when your product has recurring symbols.',
+      bullets: pt
+        ? ['Registre N, H, V ou qualquer simbolo de um caractere.', 'Use RegExp, funcao ou objeto com hint.', 'Em instancias, a regra fica isolada daquele contexto.']
+        : ['Register N, H, V, or any one-character symbol.', 'Use a RegExp, function, or object with hint.', 'Inside instances, the rule stays isolated to that context.'],
+      code: `const forge = mask.create()
+
+forge.defineSlot('H', /[0-9a-f]/i)
+forge.defineSlot('V', ch => 'AEIOUaeiou'.includes(ch))
+
+forge('HHHHHH', '1a2b3c')
+// '1a2b3c'`,
+    },
+    {
+      id: 'instances',
+      menu: pt ? 'Instancias e presets' : 'Instances and presets',
+      eyebrow: 'create()',
+      title: pt ? 'Separe regras por produto, pais ou pacote interno.' : 'Split rules by product, country, or internal package.',
+      description: pt ? 'mask.create cria uma engine propria. Isso evita estado global acidental e permite presets oficiais como presets/br.' : 'mask.create creates its own engine. This avoids accidental global state and enables official presets like presets/br.',
+      bullets: pt
+        ? ['Use para checkout BR, dashboard US ou design system.', 'Presets BR incluem CPF, CNPJ, CEP, telefone, data, mes e dinheiro.', 'Com TypeScript, os nomes registrados ganham autocomplete.']
+        : ['Use it for Brazilian checkout, US dashboard, or a design system.', 'BR presets include CPF, CNPJ, ZIP, phone, date, month, and money.', 'With TypeScript, registered names get autocomplete.'],
+      code: `import mask from 'maskarajs'
+import { br, type BrazilPresetRegistry } from 'maskarajs/presets/br'
+
+const maskBR = mask.create<BrazilPresetRegistry>(br)
+
+maskBR('cpf', '12345678909')
+// '123.456.789-09'`,
+    },
+    {
+      id: 'react',
+      menu: 'React',
+      eyebrow: 'MaskProvider',
+      title: pt ? 'Configure uma engine uma vez e use nos campos.' : 'Configure an engine once and use it in fields.',
+      description: pt ? 'O adapter React entrega useMask para inputs controlados e MaskProvider para compartilhar a instancia configurada.' : 'The React adapter provides useMask for controlled inputs and MaskProvider for sharing the configured instance.',
+      bullets: pt
+        ? ['O hook guarda o estado do campo; a engine guarda configuracoes.', 'inputProps conecta value, placeholder e onChange.', 'Ainda e possivel passar engine direto em um campo especifico.']
+        : ['The hook stores field state; the engine stores configuration.', 'inputProps wires value, placeholder, and onChange.', 'You can still pass engine directly to a specific field.'],
+      code: `import { MaskProvider, useMask } from 'maskarajs/react'
+
+function CPFInput() {
+  const cpf = useMask('cpf')
+  return <input {...cpf.inputProps({ inputMode: 'numeric' })} />
+}
+
+<MaskProvider engine={maskBR}>
+  <CPFInput />
+</MaskProvider>`,
+    },
+    {
+      id: 'dom',
+      menu: pt ? 'DOM binding' : 'DOM binding',
+      eyebrow: 'mask.on()',
+      title: pt ? 'Vincule a mascara direto em um input DOM quando fizer sentido.' : 'Bind the mask directly to a DOM input when it makes sense.',
+      description: pt ? 'mask.on e framework-agnostic: serve para Vanilla, actions, diretivas ou integracoes onde voce tem acesso ao input.' : 'mask.on is framework-agnostic: use it in Vanilla, actions, directives, or integrations where you have access to the input.',
+      bullets: pt
+        ? ['Retorna cleanup para remover listeners.', 'Dispara onValue com raw/transform e onMasked com o valor de tela.', 'Util para diretivas Vue, actions Svelte e widgets internos.']
+        : ['Returns cleanup to remove listeners.', 'Calls onValue with raw/transform and onMasked with display value.', 'Useful for Vue directives, Svelte actions, and internal widgets.'],
+      code: `const off = mask.on(inputEl, 'phone', {
+  onValue(raw) {
+    console.log(raw)
+  },
+  onMasked(masked) {
+    console.log(masked)
+  },
+})
+
+off()`,
+    },
+    {
+      id: 'utilities',
+      menu: pt ? 'Utilitarios' : 'Utilities',
+      eyebrow: 'rawLength()',
+      title: pt ? 'Meça progresso, placeholder e completude sem reinventar logica.' : 'Measure progress, placeholder, and completion without reinventing logic.',
+      description: pt ? 'Os utilitarios ajudam a montar feedback visual, liberar submit e exibir placeholders coerentes.' : 'Utilities help build visual feedback, enable submit, and show coherent placeholders.',
+      bullets: pt
+        ? ['hint() gera placeholder a partir do pattern.', 'is() indica se o campo esta completo.', 'rawLength() e patternLength() ajudam em barras de progresso.']
+        : ['hint() generates placeholder from the pattern.', 'is() tells whether the field is complete.', 'rawLength() and patternLength() help build progress bars.'],
+      code: `const total = mask.patternLength('cpf')
+const filled = mask.rawLength('cpf', value)
+const progress = filled / total
+
+mask.hint('cpf')
+// '000.000.000-00'
+
+mask.is('cpf', value)
+// true | false`,
+    },
+  ]
+}
+
 function parsePattern(text: string) {
   const trimmed = text.trim()
   if (trimmed.startsWith('[')) {
@@ -764,7 +960,7 @@ function stringify(value: unknown) {
 }
 
 function highlightCode(code: string) {
-  const tokenPattern = /(\/\/.*|\/\*[\s\S]*?\*\/|`(?:\\.|[^`])*`|'(?:\\.|[^'])*'|"(?:\\.|[^"])*"|<\/?[A-Z][A-Za-z0-9.]*\b|<\/?[a-z][A-Za-z0-9-]*\b|\b(?:import|from|export|const|let|return|if|else|true|false|null|undefined|new|function|type|interface|class|get|as|extends|public|private|readonly)\b|\b(?:mask|raw|define|defineSlot|create|is|hint|patternLength|rawLength|validate|transform|on|Number|Date|String|console|log|useState|useMemo|useEffect|useForm|useMask|inputProps|computed|ref|z|yup|Component|TextInput|View|Text)\b|\b\d+(?:\.\d+)?\b)/g
+  const tokenPattern = /(\/\/.*|\/\*[\s\S]*?\*\/|`(?:\\.|[^`])*`|'(?:\\.|[^'])*'|"(?:\\.|[^"])*"|<\/?[A-Z][A-Za-z0-9.]*\b|<\/?[a-z][A-Za-z0-9-]*\b|\b(?:import|from|export|const|let|return|if|else|true|false|null|undefined|new|function|type|interface|class|get|as|extends|public|private|readonly)\b|\b(?:mask|raw|define|defineSlot|create|is|hint|patternLength|rawLength|validate|transform|on|Number|Date|String|console|log|useState|useMemo|useEffect|useForm|useMask|useMaskEngine|MaskProvider|inputProps|computed|ref|z|yup|Component|TextInput|View|Text)\b|\b\d+(?:\.\d+)?\b)/g
   const nodes = []
   let lastIndex = 0
 
@@ -1146,6 +1342,50 @@ function CustomSlotsDemo({ locale }: { locale: Locale }) {
   )
 }
 
+function BrazilPresetsDemo({ locale }: { locale: Locale }) {
+  const copy = locale === 'pt-BR'
+    ? {
+        title: 'Comece com CPF, CNPJ, CEP, telefone, data e dinheiro prontos.',
+        text: 'O pacote maskarajs/presets/br entrega um conjunto oficial para criar uma instancia isolada com as mascaras brasileiras mais comuns.',
+        named: 'Preset',
+        value: 'Valor',
+      }
+    : {
+        title: 'Start with CPF, CNPJ, ZIP, phone, date, and money ready to use.',
+        text: 'The maskarajs/presets/br package gives you an official set for creating an isolated instance with common Brazilian masks.',
+        named: 'Preset',
+        value: 'Value',
+      }
+  const options = [
+    ['cpf', '12345678909'],
+    ['cnpj', '11222333000181'],
+    ['phone', '11987654321'],
+    ['cep', '01310930'],
+  ] as const
+  const [name, setName] = useState<(typeof options)[number][0]>('cpf')
+  const [value, setValue] = useState(maskBR(name, options[0][1]))
+  const masked = maskBR(name, value)
+  const raw = maskBR.raw(name, masked)
+
+  function changePreset(nextName: (typeof options)[number][0]) {
+    const nextValue = options.find(([option]) => option === nextName)?.[1] ?? ''
+    setName(nextName)
+    setValue(maskBR(nextName, nextValue))
+  }
+
+  return (
+    <article className="recipe-card">
+      <RecipeCopy eyebrow="presets/br" title={copy.title} text={copy.text} />
+      <div className="recipe-play">
+        <label className="field"><span>{copy.named}</span><select value={name} onChange={(event) => changePreset(event.target.value as (typeof options)[number][0])}>{options.map(([option]) => <option key={option} value={option}>{option}</option>)}</select></label>
+        <label className="field"><span>{copy.value}</span><input value={masked} placeholder={maskBR.hint(name)} onChange={(event) => setValue(maskBR(name, event.target.value))} /></label>
+        <MiniResults rows={[['masked', masked || '""'], ['raw', stringify(raw) || '""']]} />
+      </div>
+      <CodeBlock code={codeSnippets.brPresets} />
+    </article>
+  )
+}
+
 function RecipeCopy({ eyebrow, title, text }: { eyebrow: string; title: string; text: string }) {
   return <div className="recipe-copy"><span>{eyebrow}</span><h3>{title}</h3><p>{text}</p></div>
 }
@@ -1187,29 +1427,36 @@ function BenchmarkSection({ locale }: { locale: Locale }) {
   )
 }
 
-function HandSketch({ type }: { type: string }) {
-  return (
-    <svg className={`hand-sketch ${type}`} viewBox="0 0 220 150" role="img" aria-label={type}>
-      <path className="sketch-paper" d="M18 18 C58 10,146 10,202 19 C208 54,207 99,199 132 C151 142,72 141,20 132 C12 95,13 54,18 18 Z" />
-      {type === 'format' && <><path d="M35 48 C62 42,92 42,119 48" /><path d="M35 74 C72 68,108 68,146 74" /><path d="M142 50 C156 58,165 65,176 76" /><path d="M176 76 C163 84,152 91,139 101" /><rect x="35" y="94" width="120" height="24" rx="7" /></>}
-      {type === 'raw' && <><rect x="32" y="42" width="146" height="26" rx="8" /><path d="M54 82 C78 91,123 91,150 82" /><path d="M69 102 C92 108,124 108,147 102" /><path d="M36 55 L53 55 M72 55 L89 55 M109 55 L126 55 M146 55 L164 55" /></>}
-      {type === 'guard' && <><path d="M48 38 L111 24 L170 39 L161 102 C134 122,91 124,59 101 Z" /><path d="M78 73 L99 94 L142 55" /><path d="M42 122 C82 112,132 113,178 122" /></>}
-      {type === 'ready' && <><circle cx="78" cy="76" r="35" /><path d="M62 77 L75 91 L101 61" /><path d="M125 54 C145 50,166 50,187 55" /><path d="M126 79 C146 75,166 76,185 80" /><path d="M126 104 C145 101,161 101,181 105" /></>}
-      {type === 'measure' && <><path d="M38 50 L178 50" /><path d="M38 42 L38 59 M178 42 L178 59" /><rect x="44" y="78" width="24" height="24" rx="6" /><rect x="76" y="78" width="24" height="24" rx="6" /><rect x="108" y="78" width="24" height="24" rx="6" /><rect x="140" y="78" width="24" height="24" rx="6" /></>}
-      {type === 'registry' && <><rect x="34" y="36" width="64" height="38" rx="9" /><rect x="122" y="36" width="64" height="38" rx="9" /><path d="M66 76 C67 92,82 102,105 105" /><path d="M154 76 C152 93,139 102,114 105" /><rect x="78" y="101" width="64" height="24" rx="8" /></>}
-      {type === 'language' && <><path d="M40 48 C65 39, 91 39, 116 48" /><path d="M42 79 C72 71, 110 72, 146 80" /><path d="M48 108 C83 101, 125 101, 170 109" /><path d="M146 43 L178 43 L163 67 L178 91 L145 91" /><circle cx="62" cy="48" r="4" /><circle cx="93" cy="79" r="4" /><circle cx="132" cy="108" r="4" /></>}
-    </svg>
-  )
-}
-
 function ApiDocsSection({ locale }: { locale: Locale }) {
   const t = content[locale].api
-  const rows = buildApiRows(locale)
+  const topics = useMemo(() => buildDocumentation(locale), [locale])
+  const [activeId, setActiveId] = useState(topics[0].id)
+  const activeTopic = topics.find((topic) => topic.id === activeId) ?? topics[0]
   return (
-    <section className="api-docs-section">
+    <section className="api-docs-section" id="docs">
       <SectionHeading eyebrow={t.eyebrow} title={t.title} text={t.text} />
       <div className="api-flow">{t.flow.map(([title, text]) => <div key={title}><strong>{title}</strong><span>{text}</span></div>)}</div>
-      <div className="api-doc-grid">{rows.map(([label, name, description, example, sketch]) => <article className="api-doc-card" key={name}><HandSketch type={sketch} /><div className="api-doc-copy"><span>{label}</span><h3>{name}</h3><p>{description}</p></div><CodeBlock code={example} className="snippet api-example" /></article>)}</div>
+      <div className="docs-browser">
+        <nav className="docs-menu" aria-label={locale === 'pt-BR' ? 'Menu da documentacao' : 'Documentation menu'}>
+          {topics.map((topic) => (
+            <button key={topic.id} type="button" aria-pressed={activeTopic.id === topic.id} onClick={() => setActiveId(topic.id)}>
+              <span>{topic.eyebrow}</span>
+              <strong>{topic.menu}</strong>
+            </button>
+          ))}
+        </nav>
+        <article className="docs-panel">
+          <div className="docs-panel-copy">
+            <span>{activeTopic.eyebrow}</span>
+            <h3>{activeTopic.title}</h3>
+            <p>{activeTopic.description}</p>
+            <ul>
+              {activeTopic.bullets.map((bullet) => <li key={bullet}>{bullet}</li>)}
+            </ul>
+          </div>
+          <CodeBlock code={activeTopic.code} className="snippet docs-panel-code" />
+        </article>
+      </div>
     </section>
   )
 }
@@ -1291,7 +1538,25 @@ function App() {
           <div className="hero-actions"><a className="button primary" href="#playground">{t.hero.primary}</a><a className="button secondary" href="#benchmark">{t.hero.secondary}</a></div>
           <div className="stats" aria-label="Maskarajs">{t.hero.stats.map(([title, text]) => <div key={title}><strong>{title}</strong><span>{text}</span></div>)}</div>
         </div>
-        <div className="visual" aria-label="Mask example"><PatternVisualizer patternText="##[/]{0-1}#[/]####" locale={locale} /><CodeBlock className="hero-code" code={`mask.define('month', {\n  pattern: '{0-1}#',\n  validate: raw => Number(raw) <= 12\n})\n\nmask('month', '19') // '1'`} /></div>
+        <div className="visual" aria-label="Mask example">
+          <div className="mascot-classroom" aria-hidden="true">
+            <div className="chalkboard">
+              <span className="chalk-label">pattern</span>
+              <code>##[/]{'{0-1}'}#[/]####</code>
+              <small>raw: 01122025 → 01/12/2025</small>
+              <i className="chalk-line line-one" />
+              <i className="chalk-line line-two" />
+            </div>
+            <div className="mascot-stage">
+              <span className="mascot-rune rune-a">#</span>
+              <span className="mascot-rune rune-b">{'{N}'}</span>
+              <span className="mascot-rune rune-c">[]</span>
+              <img className="hero-mascot" src={mascotLogo} alt="" />
+            </div>
+          </div>
+          <PatternVisualizer patternText="##[/]{0-1}#[/]####" locale={locale} />
+          <CodeBlock className="hero-code" code={`mask.define('month', {\n  pattern: '{0-1}#',\n  validate: raw => Number(raw) <= 12\n})\n\nmask('month', '19') // '1'`} />
+        </div>
       </section>
       <SyntaxIntro locale={locale} />
       <Playground locale={locale} presets={presets} />
@@ -1299,7 +1564,7 @@ function App() {
       <ExampleGallery locale={locale} examples={examples} />
       <section className="docs-section" id="implementacao"><SectionHeading eyebrow={t.docs.eyebrow} title={t.docs.title} text={t.docs.text} /><div className="implementation"><div className="tabs" role="tablist" aria-label="Frameworks">{(['React', 'Vue', 'Angular', 'React Native', 'Vanilla'] as Framework[]).map((item) => <button key={item} type="button" role="tab" aria-selected={framework === item} onClick={() => setFramework(item)}>{item}</button>)}</div><CodeBlock code={snippets[framework]} /></div></section>
       <ReactFormsSection locale={locale} />
-      <section className="recipes-section" id="receitas"><SectionHeading eyebrow={t.recipes.eyebrow} title={t.recipes.title} text={t.recipes.text} /><div className="recipes-grid"><ValidateDemo locale={locale} /><CustomSlotsDemo locale={locale} /><DefineDemo locale={locale} /><CreateDemo locale={locale} /></div></section>
+      <section className="recipes-section" id="receitas"><SectionHeading eyebrow={t.recipes.eyebrow} title={t.recipes.title} text={t.recipes.text} /><div className="recipes-grid"><ValidateDemo locale={locale} /><BrazilPresetsDemo locale={locale} /><CustomSlotsDemo locale={locale} /><DefineDemo locale={locale} /><CreateDemo locale={locale} /></div></section>
       <WhyMaskSection locale={locale} />
       <BenchmarkSection locale={locale} />
       <ApiDocsSection locale={locale} />

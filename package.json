@@ -15,6 +15,11 @@
       "import": "./react.mjs",
       "require": "./react.cjs.js",
       "types": "./react.d.ts"
+    },
+    "./presets/br": {
+      "import": "./presets/br.mjs",
+      "require": "./presets/br.cjs.js",
+      "types": "./presets/br.d.ts"
     }
   },
   "files": [
@@ -26,6 +31,7 @@
     "react.mjs",
     "react.cjs.js",
     "react.d.ts",
+    "presets",
     "README.md"
   ],
   "peerDependencies": {
