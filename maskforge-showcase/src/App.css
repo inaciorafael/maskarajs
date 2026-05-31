@@ -115,7 +115,7 @@ main {
   border-radius: 999px;
   padding: 0 20px;
   color: #fff;
-  background: linear-gradient(135deg, var(--teal), var(--ink) 54%, var(--coral));
+  background: linear-gradient(135deg, var(--teal), blue 54%, var(--coral));
   box-shadow:
     0 16px 40px rgb(8 127 114 / 26%),
     0 0 0 0 rgb(8 127 114 / 22%);
@@ -1949,4 +1949,9 @@ output:last-child {
   .pix-support {
     display: none;
   }
+}
+
+.logo {
+  height: 70px;
+  with: 70px;
 }

@@ -1,6 +1,8 @@
 export type Locale = 'pt-BR' | 'en'
 export type Theme = 'light' | 'dark'
 
+import Logo from '../assets/logo.png'
+
 type TopNavProps = {
   locale: Locale
   onLocaleChange: (locale: Locale) => void
@@ -27,17 +29,6 @@ export function TopNav({
   return (
     <header className="top-nav">
       <a className="site-logo" href="#top" aria-label="maskarajs">
-        <svg viewBox="0 0 64 64" role="img" aria-label="maskarajs logo">
-          <path className="rune-plate" d="M13 15 C22 8, 43 8, 52 15 C58 24, 57 42, 51 50 C41 58, 23 58, 13 50 C7 41, 7 24, 13 15 Z" />
-          <path d="M20 43 C25 36, 29 28, 33 18" />
-          <path d="M33 18 C38 28, 43 36, 48 43" />
-          <path d="M25 34 C30 31, 35 31, 40 34" />
-          <path d="M24 22 C28 25, 31 27, 35 30" />
-          <path d="M42 22 C38 26, 35 29, 31 33" />
-          <path className="rune-accent" d="M18 47 C27 51, 39 51, 48 47" />
-          <circle cx="24" cy="39" r="1.7" />
-          <circle cx="42" cy="39" r="1.7" />
-        </svg>
         <span>maskarajs</span>
       </a>
 
