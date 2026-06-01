@@ -1,6 +1,6 @@
 {
   "name": "maskarajs",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Engine de máscaras declarativo — framework-agnostic, zero dependências, ~4kb",
   "main": "./mask.cjs.js",
   "module": "./mask.mjs",
@@ -47,8 +47,18 @@
   },
   "sideEffects": false,
   "keywords": [
-    "mask", "input-mask", "form", "cpf", "cnpj", "phone",
-    "date", "money", "react", "vue", "svelte", "vanilla"
+    "mask",
+    "input-mask",
+    "form",
+    "cpf",
+    "cnpj",
+    "phone",
+    "date",
+    "money",
+    "react",
+    "vue",
+    "svelte",
+    "vanilla"
   ],
   "license": "MIT",
   "engines": {
