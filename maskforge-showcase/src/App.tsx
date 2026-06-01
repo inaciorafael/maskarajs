@@ -406,37 +406,37 @@ const content = {
     },
     pix: {
       support: "Apoie o projeto",
-      button: "Pague um Monster",
-      modalEyebrow: "Apoie o Maskarajs",
-      title: "Pague um Monster para manter a forja acesa.",
-      body: "Se a lib poupou alguns handlers, validacoes duplicadas ou aquela tarde brigando com mascara de input, considere apoiar. Pequenas doacoes ajudam a reservar tempo para melhorias, docs e exemplos melhores.",
+      button: "Apoiar com Pix",
+      modalEyebrow: "Apoie o MaskaraJS",
+      title: "Ajude o MaskaraJS a continuar gratuito, cuidado e bem documentado.",
+      body: "Se a lib economizou alguns minutos do seu dia, uma pequena contribuicao ajuda a manter o projeto vivo, melhorar exemplos e abrir espaco para novas features.",
       popular: "mais escolhido",
       how: "Como doar",
       howBody:
-        "Abra o app do banco, escaneie o QR ou copie a chave Pix. Escolha a faixa que fizer sentido para voce.",
+        "Abra o app do banco, escaneie o QR ou copie a chave Pix. Escolha uma faixa pronta ou use o valor livre para apoiar do seu jeito.",
       copied: "Chave copiada",
       copy: "Copiar chave Pix",
       close: "Fechar popup de doacao",
       tiers: [
         [
           "R$ 7",
-          "Gole simbolico",
-          "Para quem curtiu a ideia e quer deixar um sinal de apoio.",
+          "Um cafe de build",
+          "Um apoio leve para dizer: isso me ajudou.",
         ],
         [
           "R$ 15",
-          "Pague um Monster",
-          "A faixa mais facil de escolher: energia para manter o projeto andando.",
+          "Empurrao nos presets",
+          "Ajuda a criar exemplos, presets e pequenos refinamentos da lib.",
         ],
         [
           "R$ 30",
-          "Sprint de energia",
-          "Para quem usou o Maskarajs em um formulario real e quer fortalecer a lib.",
+          "Forca para features",
+          "Para quem usou em projeto real e quer ver o MaskaraJS amadurecer.",
         ],
         [
-          "R$ 50+",
-          "Backer frontend",
-          "Para times e devs que querem ver a ferramenta amadurecer com carinho.",
+          "Livre",
+          "Apoie do seu jeito",
+          "Escolha qualquer valor no Pix e contribua no seu ritmo.",
         ],
       ],
     },
@@ -654,37 +654,37 @@ const content = {
     },
     pix: {
       support: "Support the project",
-      button: "Buy me a Monster",
-      modalEyebrow: "Support Maskarajs",
-      title: "Buy me a Monster and keep the forge warm.",
-      body: "If this library saved you a few handlers, duplicated validations, or an afternoon fighting input masks, consider supporting it. Small donations help reserve time for improvements, docs, and better examples.",
+      button: "Support with Pix",
+      modalEyebrow: "Support MaskaraJS",
+      title: "Help keep MaskaraJS free, cared for, and well documented.",
+      body: "If the library saved you a few minutes, a small contribution helps keep the project alive, improve examples, and make room for new features.",
       popular: "most picked",
       how: "How to donate",
       howBody:
-        "Open your banking app, scan the QR code, or copy the Pix key. Choose the tier that feels right to you.",
+        "Open your banking app, scan the QR code, or copy the Pix key. Pick a ready tier or use the custom amount to support it your way.",
       copied: "Pix key copied",
       copy: "Copy Pix key",
       close: "Close donation popup",
       tiers: [
         [
           "R$ 7",
-          "Small sip",
-          "For anyone who liked the idea and wants to leave a small sign of support.",
+          "Build coffee",
+          "A light way to say: this helped me.",
         ],
         [
           "R$ 15",
-          "Buy a Monster",
-          "The easiest tier to pick: a little energy to keep the project moving.",
+          "Preset boost",
+          "Helps create examples, presets, and small library refinements.",
         ],
         [
           "R$ 30",
-          "Energy sprint",
-          "For anyone who used Maskarajs in a real form and wants to strengthen the library.",
+          "Feature support",
+          "For anyone using it in a real project and wanting MaskaraJS to mature.",
         ],
         [
-          "R$ 50+",
-          "Frontend backer",
-          "For teams and devs who want to see the tool mature with care.",
+          "Custom",
+          "Support your way",
+          "Choose any Pix amount and contribute at your own pace.",
         ],
       ],
     },
@@ -2638,11 +2638,6 @@ function App() {
 
   useEffect(() => {
     if (window.sessionStorage.getItem("maskarajs-donation-seen")) return;
-    const timer = window.setTimeout(() => {
-      setDonationOpen(true);
-      window.sessionStorage.setItem("maskarajs-donation-seen", "true");
-    }, 2200);
-    return () => window.clearTimeout(timer);
   }, []);
 
   return (
