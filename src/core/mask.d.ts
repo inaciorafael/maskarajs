@@ -322,7 +322,7 @@ export declare namespace mask {
    *   onValue: date => ...  // date: Date | null ✓ (inferido)
    * })
    */
-  function create<R extends Record<string, unknown> = Record<string, string>>(
+  function create<R extends Record<string, unknown> = {}>(
     presets?: { [K in keyof R]: MaskDefinition<R[K]> }
   ): MaskInstance<R>
 }

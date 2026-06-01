@@ -1,4 +1,4 @@
-import type { MaskaraDefinition } from '../mask'
+import type { MaskaraDefinition } from '../core/mask'
 
 export interface BrazilPresetRegistry {
   cpf: string

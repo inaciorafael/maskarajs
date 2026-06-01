@@ -1,5 +1,5 @@
 import { createContext, createElement, useCallback, useContext, useMemo, useState } from 'react'
-import maskara from '../../mask.mjs'
+import maskara from '../../core/mask.mjs'
 
 const MaskaraEngineContext = createContext(maskara)
 

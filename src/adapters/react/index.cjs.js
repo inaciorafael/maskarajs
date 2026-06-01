@@ -1,7 +1,7 @@
 'use strict'
 
 const React = require('react')
-const maskara = require('./mask.cjs.js')
+const maskara = require('../../core/mask.cjs.js')
 
 const MaskaraEngineContext = React.createContext(maskara)
 

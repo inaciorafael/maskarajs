@@ -2,46 +2,47 @@
   "name": "maskarajs",
   "version": "1.0.2",
   "description": "Engine de máscaras declarativo — framework-agnostic, zero dependências, ~4kb",
-  "main": "./mask.cjs.js",
-  "module": "./mask.mjs",
-  "types": "./mask.d.ts",
+  "main": "./src/core/mask.cjs.js",
+  "module": "./src/core/mask.mjs",
+  "types": "./src/core/mask.d.ts",
   "scripts": {
     "test": "node test/mask.test.mjs"
   },
   "exports": {
     ".": {
-      "import": "./mask.mjs",
-      "require": "./mask.cjs.js",
-      "types": "./mask.d.ts"
+      "import": "./src/core/mask.mjs",
+      "require": "./src/core/mask.cjs.js",
+      "types": "./src/core/mask.d.ts"
     },
     "./react": {
-      "import": "./react.mjs",
-      "require": "./react.cjs.js",
-      "types": "./react.d.ts"
+      "import": "./src/adapters/react/index.mjs",
+      "require": "./src/adapters/react/index.cjs.js",
+      "types": "./src/adapters/react/index.d.ts"
+    },
+    "./vue": {
+      "import": "./src/adapters/vue/index.mjs",
+      "require": "./src/adapters/vue/index.cjs.js",
+      "types": "./src/adapters/vue/index.d.ts"
     },
     "./presets/br": {
-      "import": "./presets/br.mjs",
-      "require": "./presets/br.cjs.js",
-      "types": "./presets/br.d.ts"
+      "import": "./src/presets/br.mjs",
+      "require": "./src/presets/br.cjs.js",
+      "types": "./src/presets/br.d.ts"
     }
   },
   "files": [
     "src",
-    "mask.js",
-    "mask.mjs",
-    "mask.cjs.js",
-    "mask.d.ts",
-    "react.mjs",
-    "react.cjs.js",
-    "react.d.ts",
-    "presets",
     "README.md"
   ],
   "peerDependencies": {
-    "react": ">=18"
+    "react": ">=18",
+    "vue": ">=3"
   },
   "peerDependenciesMeta": {
     "react": {
+      "optional": true
+    },
+    "vue": {
       "optional": true
     }
   },

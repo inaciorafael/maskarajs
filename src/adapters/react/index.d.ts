@@ -1,5 +1,5 @@
 import type { ChangeEvent, InputHTMLAttributes, ReactNode } from 'react'
-import type { MaskaraInstance, MaskaraPattern } from './mask'
+import type { MaskaraInstance, MaskaraPattern } from '../../core/mask'
 
 export type MaskaraInputChange = ChangeEvent<HTMLInputElement> | string | number | null | undefined
 export type MaskInputChange = MaskaraInputChange
@@ -7,7 +7,7 @@ export type MaskInputChange = MaskaraInputChange
 export interface UseMaskaraOptions<T = string> {
   value?: string | null | undefined
   defaultValue?: string | null | undefined
-  engine?: MaskaraInstance | typeof import('./mask').default
+  engine?: MaskaraInstance | typeof import('../../core/mask').default
   onValue?: (value: T) => void
   onMaskara?: (masked: string) => void
   onMasked?: (masked: string) => void
@@ -33,7 +33,7 @@ export interface UseMaskaraResult<T = string> {
 export type UseMaskResult<T = string> = UseMaskaraResult<T>
 
 export interface MaskaraProviderProps {
-  engine?: MaskaraInstance | typeof import('./mask').default
+  engine?: MaskaraInstance | typeof import('../../core/mask').default
   children?: ReactNode
 }
 export type MaskProviderProps = MaskaraProviderProps
@@ -41,8 +41,8 @@ export type MaskProviderProps = MaskaraProviderProps
 export declare function MaskaraProvider(props: MaskaraProviderProps): ReactNode
 export declare function MaskProvider(props: MaskProviderProps): ReactNode
 
-export declare function useMaskaraEngine(): MaskaraInstance | typeof import('./mask').default
-export declare function useMaskEngine(): MaskaraInstance | typeof import('./mask').default
+export declare function useMaskaraEngine(): MaskaraInstance | typeof import('../../core/mask').default
+export declare function useMaskEngine(): MaskaraInstance | typeof import('../../core/mask').default
 
 export declare function useMaskara<T = string>(
   pattern: MaskaraPattern,

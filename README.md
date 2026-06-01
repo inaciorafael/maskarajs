@@ -94,6 +94,89 @@ const cpf = useMaskara('cpf', { engine: appMaskara })
 
 The hook stores field state. The engine stores mask configuration.
 
+## Vue 3 adapter
+
+The Vue adapter is optional and lives in `maskarajs/vue`. Its default export is a Vue 3 directive ready for `v-maskara`. Use it locally in a component or register it once as a plugin.
+
+### Local directive
+
+```vue
+<script setup lang="ts">
+import { maskaraDirective as vMaskara } from 'maskarajs/vue'
+
+const pattern = '###[.]###[.]###[-]##'
+</script>
+
+<template>
+  <input v-maskara="pattern" inputmode="numeric" />
+</template>
+```
+
+### With `v-model` and raw value callback
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue'
+import { maskaraDirective as vMaskara } from 'maskarajs/vue'
+
+const document = ref('')
+const rawDocument = ref('')
+</script>
+
+<template>
+  <input
+    v-model="document"
+    v-maskara="{
+      pattern: '###[.]###[.]###[-]##',
+      onValue: value => rawDocument = value
+    }"
+    inputmode="numeric"
+  />
+</template>
+```
+
+The directive listens during the capture phase, so Vue's `v-model` receives the masked value during the same input event.
+
+### Register globally
+
+```ts
+import { createApp } from 'vue'
+import { createMaskaraPlugin } from 'maskarajs/vue'
+import App from './App.vue'
+
+createApp(App)
+  .use(createMaskaraPlugin())
+  .mount('#app')
+```
+
+Then use it anywhere:
+
+```vue
+<input v-maskara="'#####[-]###'" />
+```
+
+### Use an isolated engine
+
+```ts
+import maskara from 'maskarajs'
+import { createMaskaraPlugin } from 'maskarajs/vue'
+
+const br = maskara.create({
+  cpf: { pattern: '###[.]###[.]###[-]##' },
+  phone: { pattern: ['[(]##[)] ####[-]####', '[(]##[)] #####[-]####'] },
+})
+
+app.use(createMaskaraPlugin({ engine: br }))
+```
+
+You can also create a directive instance manually:
+
+```ts
+import { createMaskaraDirective } from 'maskarajs/vue'
+
+const vMaskara = createMaskaraDirective({ engine: br })
+```
+
 ## Examples
 
 ```js

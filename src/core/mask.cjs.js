@@ -994,7 +994,9 @@ mask.create = function (presets = {}) {
 
 // ─── Export ────────────────────────────────────────────────────────────────
 
-// export { mask }
+const maskara = mask
+
+// export { mask, maskara }
 // export default mask
 
 module.exports = mask

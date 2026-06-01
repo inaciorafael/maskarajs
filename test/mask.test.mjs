@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
-import maskara, { mask, maskara as namedMaskara } from '../mask.mjs'
+import maskara, { mask, maskara as namedMaskara } from '../src/core/mask.mjs'
+import maskaraDirective, { createMaskaraDirective, createMaskaraPlugin, vMaskara } from '../src/adapters/vue/index.mjs'
 
 const require = createRequire(import.meta.url)
-const cjsMaskara = require('../mask.cjs.js')
+const cjsMaskara = require('../src/core/mask.cjs.js')
+const cjsVue = require('../src/adapters/vue/index.cjs.js')
 
 const test = (name, fn) => {
   try {
@@ -21,6 +23,9 @@ test('exports default and named aliases', () => {
   assert.equal(cjsMaskara, cjsMaskara.mask)
   assert.equal(cjsMaskara, cjsMaskara.maskara)
   assert.equal(cjsMaskara, cjsMaskara.default)
+  assert.equal(maskaraDirective, vMaskara)
+  assert.equal(cjsVue, cjsVue.maskaraDirective)
+  assert.equal(cjsVue, cjsVue.default)
 })
 
 test('applies a single pattern and strips literals in raw', () => {
@@ -101,6 +106,8 @@ test('supports custom slots globally and inside isolated instances', () => {
   maskara.undefineSlot('N')
 
   const forge = maskara.create()
+  forge.define('testHexPair', { pattern: 'HH' })
+  forge.undefine('testHexPair')
   forge.defineSlot('H', /[0-9a-f]/i)
   forge.defineSlot('V', ch => 'AEIOUaeiou'.includes(ch))
   assert.equal(forge('HHHHHH', '1a2b3c'), '1a2b3c')
@@ -159,4 +166,65 @@ test('binds to DOM-like inputs with maskara.on', () => {
 
   off()
   assert.equal(listeners.size, 0)
+})
+
+test('provides a Vue 3 directive for v-maskara', () => {
+  const listeners = new Map()
+  const input = {
+    value: '12345678909',
+    selectionStart: 11,
+    addEventListener(type, listener, options) {
+      listeners.set(`${type}:${options === true ? 'capture' : 'bubble'}`, listener)
+    },
+    removeEventListener(type, listener, options) {
+      const key = `${type}:${options === true ? 'capture' : 'bubble'}`
+      if (listeners.get(key) === listener) listeners.delete(key)
+    },
+    setSelectionRange(start) {
+      this.selectionStart = start
+    },
+  }
+
+  let rawValue = ''
+  let maskedValue = ''
+  const directive = createMaskaraDirective()
+
+  directive.mounted(input, {
+    value: {
+      pattern: '###[.]###[.]###[-]##',
+      onValue: value => { rawValue = value },
+      onMaskara: value => { maskedValue = value },
+    },
+  })
+
+  assert.equal(input.value, '123.456.789-09')
+  assert.equal(listeners.has('input:capture'), true)
+  assert.equal(listeners.has('keydown:bubble'), true)
+
+  input.value = '98765432100'
+  input.selectionStart = input.value.length
+  listeners.get('input:capture')({ target: input })
+
+  assert.equal(input.value, '987.654.321-00')
+  assert.equal(rawValue, '98765432100')
+  assert.equal(maskedValue, '987.654.321-00')
+
+  directive.beforeUnmount(input)
+  assert.equal(listeners.size, 0)
+})
+
+test('provides a Vue plugin that registers v-maskara by default', () => {
+  const calls = []
+  const app = {
+    directive(name, directive) {
+      calls.push([name, directive])
+    },
+  }
+
+  createMaskaraPlugin().install(app)
+  createMaskaraPlugin({ name: 'maskara-br', engine: maskara.create() }).install(app)
+
+  assert.equal(calls[0][0], 'maskara')
+  assert.equal(typeof calls[0][1].mounted, 'function')
+  assert.equal(calls[1][0], 'maskara-br')
 })

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import maskara from "../../mask.js";
+import maskara from "../../src/core/mask";
 import { DonationSupport } from "./components/DonationSupport";
 import { TopNav, type Locale, type Theme } from "./components/TopNav";
 import mascotLogo from "./assets/logo-hero.png";
@@ -8,6 +8,12 @@ import "./App.css";
 type Framework = "React" | "Vue" | "Angular" | "React Native" | "Vanilla";
 type RegistryName = "BR" | "US";
 type BlockKind = "slot" | "literal" | "expr" | "name" | "pattern";
+type DynamicMaskara = {
+  (pattern: string, value: string | null | undefined): string;
+  raw(pattern: string, value: string | null | undefined): unknown;
+  hint(pattern: string): string;
+  names(): string[];
+};
 
 type Preset = {
   name: string;
@@ -324,6 +330,27 @@ export function App() {
     </MaskaraProvider>
   )
 }`,
+  vueDirective: `import { createApp } from 'vue'
+import maskara from 'maskarajs'
+import { createMaskaraPlugin } from 'maskarajs/vue'
+import App from './App.vue'
+
+const appMaskara = maskara.create({
+  cpf: { pattern: '###[.]###[.]###[-]##' },
+  phone: { pattern: ['[(]##[)] ####[-]####', '[(]##[)] #####[-]####'] },
+})
+
+createApp(App)
+  .use(createMaskaraPlugin({ engine: appMaskara }))
+  .mount('#app')
+
+// In any Vue 3 template:
+// <input v-model="cpf" v-maskara="'cpf'" inputmode="numeric" />
+
+// Local callback for raw value:
+// <input
+//   v-maskara="{ pattern: 'cpf', onValue: value => rawCpf = value }"
+// />`,
   validate: `maskara.define('month', {
   pattern: '{0-1}#',
   validate: (raw, masked, complete) => {
@@ -579,9 +606,9 @@ const content = {
       text: "React, Vue, Angular, React Native e Vanilla podem usar a mesma API: aplique maskara() no input, leia raw() para salvar e is() para saber quando esta completo.",
     },
     reactForms: {
-      eyebrow: "React forms",
-      title: "Quando quiser conveniencia no React, use o hook pronto.",
-      text: "O adapter React agora tambem tem MaskaraProvider: configure uma instancia uma vez e use useMaskara nos campos sem repetir engine em todo componente.",
+      eyebrow: "Adapters",
+      title: "Use adaptadores prontos quando quiser menos boilerplate.",
+      text: "React tem useMaskara e Provider. Vue 3 tem v-maskara e plugin global para conectar inputs sem repetir handlers.",
       soon: "Em breve",
       cards: [
         [
@@ -589,8 +616,8 @@ const content = {
           "O caminho curto para inputs React controlados, mantendo masked na tela e raw disponivel no retorno.",
         ],
         [
-          "useMaskaraDirective",
-          "Diretiva pensada para Vue 3, para aplicar mascara sem repetir handler em cada input.",
+          "v-maskara",
+          "Diretiva Vue 3 pronta para v-model, callbacks de raw e instancias criadas com maskara.create.",
         ],
         [
           "maskaraDirective",
@@ -816,9 +843,9 @@ const content = {
       text: "React, Vue, Angular, React Native, and Vanilla can use the same API: apply maskara() in the input, read raw() for storage, and is() for completion.",
     },
     reactForms: {
-      eyebrow: "React forms",
-      title: "When you want React convenience, use the ready hook.",
-      text: "The React adapter now also has MaskaraProvider: configure an instance once and call useMaskara in fields without repeating engine in every component.",
+      eyebrow: "Adapters",
+      title: "Use ready adapters when you want less boilerplate.",
+      text: "React has useMaskara and Provider. Vue 3 has v-maskara and a global plugin to connect inputs without repeating handlers.",
       soon: "Coming soon",
       cards: [
         [
@@ -826,8 +853,8 @@ const content = {
           "The shortest path for controlled React inputs, keeping masked on screen and raw in the returned object.",
         ],
         [
-          "useMaskaraDirective",
-          "A Vue 3 directive designed to apply masks without repeating handlers on every input.",
+          "v-maskara",
+          "A Vue 3 directive ready for v-model, raw callbacks, and instances created with maskara.create.",
         ],
         [
           "maskaraDirective",
@@ -1044,7 +1071,7 @@ function buildHookExamples(locale: Locale): HookExample[] {
       framework: "Vue 3",
       title: t.cards[1][0],
       description: t.cards[1][1],
-      soon: true,
+      code: codeSnippets.vueDirective,
     },
     {
       framework: "Angular",
@@ -1145,6 +1172,35 @@ maskara('{[0-9a-fA-F]}{[0-9a-fA-F]}{[0-9a-fA-F]}', '1z2')
           "Avoid repeating long patterns across components.",
           "Keep validate and transform close to the maskara.",
           "Works globally or inside an isolated instance.",
+        ],
+      code: `maskara.define('date', {
+  pattern: '##[/]{0-1}#[/]####',
+  validate: raw => raw.length < 4 || Number(raw.slice(2, 4)) <= 12,
+})
+
+maskara('date', '01122025')
+// '01/12/2025'`,
+    },
+    {
+      id: "define",
+      menu: "define()",
+      eyebrow: "validate()",
+      title: pt
+        ? "Mantenha regras contextuais junto da mascara."
+        : "Keep contextual rules close to the mask.",
+      description: pt
+        ? "Use validate e transform quando o pattern sozinho nao basta, como datas, dinheiro e conversoes para objetos."
+        : "Use validate and transform when the pattern alone is not enough, such as dates, money, and object conversions.",
+      bullets: pt
+        ? [
+          "validate roda durante a digitacao e pode recusar o proximo caractere.",
+          "transform converte o raw antes de entregar para raw().",
+          "is() continua indicando se a mascara esta completa.",
+        ]
+        : [
+          "validate runs while typing and can reject the next character.",
+          "transform converts raw before raw() returns it.",
+          "is() still tells whether the mask is complete.",
         ],
       code: `maskara.define('date', {
   pattern: '##[/]{0-1}#[/]####',
@@ -1310,6 +1366,37 @@ function CPFInput() {
 <MaskaraProvider engine={maskaraBR}>
   <CPFInput />
 </MaskaraProvider>`,
+    },
+    {
+      id: "vue",
+      menu: "Vue 3",
+      eyebrow: "v-maskara",
+      title: pt
+        ? "Use a diretiva Vue 3 quando o template deve ficar simples."
+        : "Use the Vue 3 directive when the template should stay simple.",
+      description: pt
+        ? "O entrypoint maskarajs/vue exporta v-maskara, createMaskaraDirective e createMaskaraPlugin. A diretiva funciona com v-model e tambem expõe callbacks para raw e valor mascarado."
+        : "The maskarajs/vue entrypoint exports v-maskara, createMaskaraDirective, and createMaskaraPlugin. The directive works with v-model and also exposes callbacks for raw and masked values.",
+      bullets: pt
+        ? [
+          "Registre globalmente com createMaskaraPlugin().",
+          "Use createMaskaraDirective({ engine }) para instancia propria.",
+          "onValue recebe o raw/transform enquanto o input exibe o valor mascarado.",
+        ]
+        : [
+          "Register it globally with createMaskaraPlugin().",
+          "Use createMaskaraDirective({ engine }) for an isolated instance.",
+          "onValue receives raw/transform while the input displays the masked value.",
+        ],
+      code: `import { createApp } from 'vue'
+import { createMaskaraPlugin } from 'maskarajs/vue'
+
+createApp(App)
+  .use(createMaskaraPlugin({ engine: maskaraBR }))
+  .mount('#app')
+
+// template
+// <input v-model="cpf" v-maskara="'cpf'" inputmode="numeric" />`,
     },
     {
       id: "dom",
@@ -1593,6 +1680,197 @@ function PatternVisualizer({
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+type ChalkExample = {
+  label: string;
+  pattern: string;
+  raw: string;
+};
+
+type ChalkToken = {
+  value: string;
+  kind: BlockKind;
+};
+
+const chalkExamples: ChalkExample[] = [
+  {
+    label: "CPF",
+    pattern: "###[.]###[.]###[-]##",
+    raw: "12345678909",
+  },
+  {
+    label: "Data",
+    pattern: "##[/]{0-1}#[/]####",
+    raw: "01122025",
+  },
+  {
+    label: "CEP",
+    pattern: "#####-###",
+    raw: "98423742432",
+  },
+];
+
+function chalkLiteralValue(value: string) {
+  return value.startsWith("[") && value.endsWith("]")
+    ? value.slice(1, -1)
+    : value;
+}
+
+function chalkTextClass(kind: BlockKind) {
+  if (kind === "literal") return "text-language-literal";
+  if (kind === "expr") return "text-language-expr";
+  return "text-language-slot";
+}
+
+function chalkBorderClass(kind: BlockKind) {
+  if (kind === "literal") return "border-language-literal/70";
+  if (kind === "expr") return "border-language-expr/75";
+  return "border-language-slot/70";
+}
+
+function chalkInkClass(kind: BlockKind) {
+  if (kind === "literal") {
+    return "bg-language-literal text-[var(--language-literal-ink)]";
+  }
+  if (kind === "expr") return "bg-language-expr text-[var(--language-expr-ink)]";
+  return "bg-language-slot text-[var(--language-slot-ink)]";
+}
+
+function buildChalkValueTokens(pattern: string, raw: string): ChalkToken[] {
+  const masked = maskara(pattern, raw);
+  let cursor = 0;
+
+  return tokenizePattern(pattern)
+    .map((block) => {
+      const expected = chalkLiteralValue(block.value);
+      const length = block.kind === "literal" ? expected.length : 1;
+      const value = masked.slice(cursor, cursor + length);
+      const kind: BlockKind =
+        block.kind === "literal" || block.kind === "expr" ? block.kind : "slot";
+      cursor += length;
+
+      return {
+        value,
+        kind,
+      };
+    })
+    .filter((token) => token.value.length > 0);
+}
+
+function AnimatedChalkboard({ locale }: { locale: Locale }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const example = chalkExamples[activeIndex];
+  const patternTokens = useMemo<ChalkToken[]>(
+    () =>
+      tokenizePattern(example.pattern).map((block) => {
+        const kind: BlockKind =
+          block.kind === "literal" || block.kind === "expr"
+            ? block.kind
+            : "slot";
+
+        return {
+          value: chalkLiteralValue(block.value),
+          kind,
+        };
+      }),
+    [example.pattern],
+  );
+  const valueTokens = useMemo(
+    () => buildChalkValueTokens(example.pattern, example.raw),
+    [example.pattern, example.raw],
+  );
+  const masked = useMemo(
+    () => maskara(example.pattern, example.raw),
+    [example.pattern, example.raw],
+  );
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setActiveIndex((current) => (current + 1) % chalkExamples.length);
+    }, 5400);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const copy =
+    locale === "pt-BR"
+      ? {
+        pattern: "pattern",
+        value: "valor digitado",
+        raw: "raw",
+      }
+      : {
+        pattern: "pattern",
+        value: "typed value",
+        raw: "raw",
+      };
+
+  return (
+    <div className="relative grid min-h-[230px] content-center gap-4 overflow-hidden rounded-[10px_8px_12px_8px] border-[8px] border-[#6f4a2d] bg-[#12372f] p-[22px_22px_26px] text-[#ecfff7] shadow-[0_22px_44px_rgb(0_0_0_/_24%),inset_0_0_0_2px_rgb(255_255_255_/_8%),inset_0_-18px_36px_rgb(0_0_0_/_14%)] rotate-[-1.2deg]">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgb(255_255_255_/_9%),transparent_22%),linear-gradient(110deg,transparent,rgb(255_255_255_/_4%),transparent)] opacity-70" />
+      <div
+        className="relative z-[1] grid gap-4 animate-[chalk-example-swap_5.4s_ease-in-out_infinite]"
+        key={example.label}
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="w-fit rounded-full bg-[#ecfff7]/10 px-2 py-[3px] text-[11px] font-black uppercase tracking-normal text-[#ecfff7]/80">
+            {example.label}
+          </span>
+          <span className="font-mono text-xs font-bold text-[#ecfff7]/62">
+            {copy.raw}: {example.raw}
+          </span>
+        </div>
+
+        <div className="grid gap-2">
+          <span className="font-mono text-[11px] font-black uppercase text-[#ecfff7]/66">
+            {copy.pattern}
+          </span>
+          <div className="flex flex-wrap items-center gap-1.5 font-mono">
+            {patternTokens.map((token, index) => (
+              <span
+                className={cn(
+                  "grid min-h-8 min-w-7 place-items-center rounded-[8px_6px_9px_6px] border border-dashed bg-white/5 px-1.5 font-mono text-[clamp(14px,1.55vw,19px)] font-black leading-none [text-shadow:0_0_7px_currentColor]",
+                  chalkTextClass(token.kind),
+                  chalkBorderClass(token.kind),
+                )}
+                style={{ animationDelay: `${index * 0.06}s` }}
+                key={`pattern-${token.value}-${index}`}
+              >
+                {token.value === " " ? "\u00a0" : token.value}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid gap-2">
+          <span className="font-mono text-[11px] font-black uppercase text-[#ecfff7]/66">
+            {copy.value}
+          </span>
+          <div className="flex flex-wrap items-center gap-1.5 font-mono">
+            {valueTokens.map((token, index) => (
+              <span
+                className={cn(
+                  "grid min-h-8 min-w-7 place-items-center rounded-[8px_6px_9px_6px] px-1.5 font-mono text-[clamp(14px,1.55vw,19px)] font-black leading-none shadow-[0_0_0_1px_rgb(255_255_255_/_24%),0_8px_20px_rgb(0_0_0_/_15%)] opacity-0 animate-[chalk-value-pop_5.4s_ease-in-out_infinite]",
+                  chalkInkClass(token.kind),
+                )}
+                style={{ animationDelay: `${0.24 + index * 0.075}s` }}
+                key={`value-${token.value}-${index}`}
+              >
+                {token.value === " " ? "\u00a0" : token.value}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <small className="font-mono text-xs text-[#ecfff7]/75">
+          {example.pattern} → {masked}
+        </small>
+      </div>
+      <i className="absolute bottom-[46px] left-[22px] z-[1] h-0.5 w-[44%] rounded-full bg-[#ecfff7]/60 blur-[0.2px] rotate-[-1deg]" />
+      <i className="absolute bottom-[35px] left-[22px] z-[1] h-0.5 w-[28%] rounded-full bg-[#ecfff7]/60 opacity-70 blur-[0.2px] rotate-[1.2deg]" />
     </div>
   );
 }
@@ -2132,12 +2410,12 @@ function CreateDemo({ locale }: { locale: Locale }) {
   const [registry, setRegistry] = useState<RegistryName>("BR");
   const [name, setName] = useState("cpf");
   const [value, setValue] = useState(maskaraBR("cpf", "12345678909"));
-  const currentMask = registry === "BR" ? maskaraBR : maskaraUS;
+  const currentMask: DynamicMaskara = registry === "BR" ? maskaraBR : maskaraUS;
   const names = currentMask.names();
   const maskedValue = currentMask(name, value);
   const rawValue = currentMask.raw(name, maskedValue);
   function changeRegistry(nextRegistry: RegistryName) {
-    const nextMask = nextRegistry === "BR" ? maskaraBR : maskaraUS;
+    const nextMask: DynamicMaskara = nextRegistry === "BR" ? maskaraBR : maskaraUS;
     const nextName = nextMask.names()[0];
     setRegistry(nextRegistry);
     setName(nextName);
@@ -2716,69 +2994,7 @@ function App() {
             className="grid min-h-[250px] grid-cols-1 items-end gap-3 md:grid-cols-[1fr_240px]"
             aria-hidden="true"
           >
-            <div className="relative grid min-h-[190px] content-center gap-2.5 overflow-hidden rounded-[10px_8px_12px_8px] border-[8px] border-[#6f4a2d] bg-[#12372f] p-[22px_22px_26px] text-[#ecfff7] shadow-[0_22px_44px_rgb(0_0_0_/_24%),inset_0_0_0_2px_rgb(255_255_255_/_8%),inset_0_-18px_36px_rgb(0_0_0_/_14%)] rotate-[-1.2deg]">
-              <span className="relative z-[1] w-fit rounded-full bg-language-slot px-2 py-[3px] text-[11px] font-black uppercase text-[var(--language-slot-ink)]">
-                pattern
-              </span>
-              <div
-                className="relative z-[1] grid w-[min(100%,430px)] gap-[7px]"
-                aria-label="pattern para valor mascarado"
-              >
-                <div className="flex flex-wrap items-center gap-1 font-mono">
-                  <span className="grid min-h-8 min-w-7 place-items-center rounded-[8px_6px_9px_6px] border border-dashed border-language-slot/60 bg-white/5 font-mono text-[clamp(14px,1.6vw,20px)] font-black leading-none text-language-slot animate-[chalk-token-morph_5.8s_ease-in-out_infinite]">
-                    #
-                  </span>
-                  <span className="grid min-h-8 min-w-7 place-items-center rounded-[8px_6px_9px_6px] border border-dashed border-language-slot/60 bg-white/5 font-mono text-[clamp(14px,1.6vw,20px)] font-black leading-none text-language-slot animate-[chalk-token-morph_5.8s_ease-in-out_infinite] [animation-delay:0.08s]">
-                    #
-                  </span>
-                  <span className="grid min-h-8 min-w-7 place-items-center rounded-[8px_6px_9px_6px] border border-dashed border-language-literal/60 bg-white/5 font-mono text-[clamp(14px,1.6vw,20px)] font-black leading-none text-language-literal animate-[chalk-token-morph_5.8s_ease-in-out_infinite] [animation-delay:0.16s]">
-                    /
-                  </span>
-                  <span className="grid min-h-8 min-w-[68px] place-items-center rounded-[8px_6px_9px_6px] border border-dashed border-language-expr/70 bg-white/5 font-mono text-[clamp(14px,1.6vw,20px)] font-black leading-none text-language-expr animate-[chalk-token-morph_5.8s_ease-in-out_infinite] [animation-delay:0.24s]">
-                    {"{0-1}"}
-                  </span>
-                  <span className="grid min-h-8 min-w-7 place-items-center rounded-[8px_6px_9px_6px] border border-dashed border-language-slot/60 bg-white/5 font-mono text-[clamp(14px,1.6vw,20px)] font-black leading-none text-language-slot animate-[chalk-token-morph_5.8s_ease-in-out_infinite] [animation-delay:0.32s]">
-                    #
-                  </span>
-                  <span className="grid min-h-8 min-w-7 place-items-center rounded-[8px_6px_9px_6px] border border-dashed border-language-literal/60 bg-white/5 font-mono text-[clamp(14px,1.6vw,20px)] font-black leading-none text-language-literal animate-[chalk-token-morph_5.8s_ease-in-out_infinite] [animation-delay:0.4s]">
-                    /
-                  </span>
-                  <span className="grid min-h-8 min-w-7 place-items-center rounded-[8px_6px_9px_6px] border border-dashed border-language-slot/60 bg-white/5 font-mono text-[clamp(14px,1.6vw,20px)] font-black leading-none text-language-slot animate-[chalk-token-morph_5.8s_ease-in-out_infinite] [animation-delay:0.48s]">
-                    #
-                  </span>
-                  <span className="grid min-h-8 min-w-7 place-items-center rounded-[8px_6px_9px_6px] border border-dashed border-language-slot/60 bg-white/5 font-mono text-[clamp(14px,1.6vw,20px)] font-black leading-none text-language-slot animate-[chalk-token-morph_5.8s_ease-in-out_infinite] [animation-delay:0.56s]">
-                    #
-                  </span>
-                  <span className="grid min-h-8 min-w-7 place-items-center rounded-[8px_6px_9px_6px] border border-dashed border-language-slot/60 bg-white/5 font-mono text-[clamp(14px,1.6vw,20px)] font-black leading-none text-language-slot animate-[chalk-token-morph_5.8s_ease-in-out_infinite] [animation-delay:0.64s]">
-                    #
-                  </span>
-                  <span className="grid min-h-8 min-w-7 place-items-center rounded-[8px_6px_9px_6px] border border-dashed border-language-slot/60 bg-white/5 font-mono text-[clamp(14px,1.6vw,20px)] font-black leading-none text-language-slot animate-[chalk-token-morph_5.8s_ease-in-out_infinite] [animation-delay:0.72s]">
-                    #
-                  </span>
-                </div>
-                <div className="w-fit font-mono text-lg font-black leading-none text-language-slot animate-[chalk-arrow-pulse_5.8s_ease-in-out_infinite]">
-                  →
-                </div>
-                <div className="flex flex-wrap items-center gap-1 font-mono">
-                  {["0", "1", "/", "1", "2", "/", "2", "0", "2", "5"].map(
-                    (value, index) => (
-                      <span
-                        className="grid min-h-8 min-w-7 place-items-center rounded-[8px_6px_9px_6px] bg-[#ecfff7] font-mono text-[clamp(14px,1.6vw,20px)] font-black leading-none text-[#0d241f] opacity-0 shadow-[0_0_0_1px_rgb(255_255_255_/_50%),0_8px_20px_rgb(188_235_221_/_20%)] animate-[chalk-value-pop_5.8s_ease-in-out_infinite]"
-                        style={{ animationDelay: `${index * 0.08}s` }}
-                        key={`${value}-${index}`}
-                      >
-                        {value}
-                      </span>
-                    ),
-                  )}
-                </div>
-              </div>
-              <small className="relative z-[1] font-mono text-xs text-[#ecfff7]/75">
-                raw: 01122025 → 01/12/2025
-              </small>
-              <i className="absolute bottom-[46px] left-[22px] z-[1] h-0.5 w-[44%] rounded-full bg-[#ecfff7]/60 blur-[0.2px] rotate-[-1deg]" />
-              <i className="absolute bottom-[35px] left-[22px] z-[1] h-0.5 w-[28%] rounded-full bg-[#ecfff7]/60 opacity-70 blur-[0.2px] rotate-[1.2deg]" />
-            </div>
+            <AnimatedChalkboard locale={locale} />
             <div className="relative grid aspect-square w-[min(235px,100%)] place-items-center justify-self-center rounded-[28px_18px_26px_18px] border border-white/15 bg-[radial-gradient(circle_at_50%_48%,rgb(244_185_66_/_30%),transparent_54%),linear-gradient(145deg,rgb(255_255_255_/_10%),rgb(255_255_255_/_2%))] shadow-[0_24px_60px_rgb(0_0_0_/_24%),inset_0_0_0_1px_rgb(255_255_255_/_8%)] animate-[mascot-float_6s_ease-in-out_infinite]">
               <span className="absolute left-[-12px] top-[12%] z-[2] grid min-h-[34px] min-w-[38px] place-items-center rounded-full border border-white/20 bg-amber px-2.5 font-mono text-[13px] font-black text-[#101917] shadow-[0_12px_24px_rgb(0_0_0_/_18%)] animate-[rune-drift_5.5s_ease-in-out_infinite]">
                 #
