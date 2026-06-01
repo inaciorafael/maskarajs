@@ -1,4 +1,4 @@
-import type { MaskDefinition } from '../mask'
+import type { MaskaraDefinition } from '../mask'
 
 export interface BrazilPresetRegistry {
   cpf: string
@@ -11,13 +11,13 @@ export interface BrazilPresetRegistry {
 }
 
 export declare const br: {
-  cpf: MaskDefinition<string>
-  cnpj: MaskDefinition<string>
-  cep: MaskDefinition<string | null>
-  phone: MaskDefinition<string>
-  date: MaskDefinition<Date | null>
-  month: MaskDefinition<string>
-  money: MaskDefinition<number>
+  cpf: MaskaraDefinition<string>
+  cnpj: MaskaraDefinition<string>
+  cep: MaskaraDefinition<string | null>
+  phone: MaskaraDefinition<string>
+  date: MaskaraDefinition<Date | null>
+  month: MaskaraDefinition<string>
+  money: MaskaraDefinition<number>
 }
 
 export default br

@@ -5,6 +5,9 @@
   "main": "./mask.cjs.js",
   "module": "./mask.mjs",
   "types": "./mask.d.ts",
+  "scripts": {
+    "test": "node test/mask.test.mjs"
+  },
   "exports": {
     ".": {
       "import": "./mask.mjs",

@@ -13,6 +13,9 @@ type TopNavProps = {
   donateLabel: string
 }
 
+const switchClass = 'inline-grid grid-cols-2 gap-1 rounded-full border border-line/80 bg-surface-glass p-1 shadow-maskara-soft backdrop-blur-2xl'
+const switchButtonClass = 'min-h-8 cursor-pointer rounded-full border-0 bg-transparent px-3 text-xs font-black text-muted aria-pressed:bg-ink aria-pressed:text-ink-contrast'
+
 export function TopNav({
   locale,
   onLocaleChange,
@@ -25,28 +28,27 @@ export function TopNav({
   donateLabel,
 }: TopNavProps) {
   return (
-    <header className="top-nav">
-      <a className="site-logo" href="#top" aria-label="maskarajs">
+    <header className="pointer-events-none fixed left-4 right-4 top-[18px] z-[34] flex items-center justify-between gap-3.5 min-[1220px]:left-[calc((100vw-1180px)/2)] min-[1220px]:right-[calc((100vw-1180px)/2)]">
+      <a className="pointer-events-auto inline-flex items-center gap-2.5 rounded-full border border-line/80 bg-surface-glass py-2 pr-3 pl-2 font-black text-ink no-underline shadow-maskara-soft backdrop-blur-2xl max-sm:[&>span]:hidden" href="#top" aria-label="maskarajs">
         <span>maskarajs</span>
       </a>
 
-      <div className="top-nav-actions">
-        <button className="top-donate-button" type="button" onClick={onDonate}>
+      <div className="pointer-events-auto flex items-center gap-2.5">
+        <button className="relative isolate min-h-12 overflow-hidden rounded-full border border-white/30 bg-[linear-gradient(135deg,var(--teal),blue_54%,var(--coral))] px-5 text-sm font-black text-white shadow-[0_16px_40px_rgb(8_127_114_/_26%),0_0_0_0_rgb(8_127_114_/_22%)] transition duration-200 animate-[pix-button-pulse_2.4s_ease-in-out_infinite] hover:-translate-y-0.5 hover:scale-[1.025] hover:saturate-[1.08] max-sm:px-4" type="button" onClick={onDonate}>
           {donateLabel}
         </button>
-        <div className="theme-switch" aria-label={themeLabel}>
+        <div className={switchClass} aria-label={themeLabel}>
           {(['light', 'dark'] as Theme[]).map((item) => (
-            <button key={item} type="button" aria-pressed={theme === item} onClick={() => onThemeChange(item)}>
-              <span className="nav-full">{themeOptions[item]}</span>
-              <span className="nav-icon" aria-hidden="true">{item === 'light' ? '☼' : '◐'}</span>
+            <button className={switchButtonClass} key={item} type="button" aria-pressed={theme === item} onClick={() => onThemeChange(item)}>
+              <span className="max-sm:hidden">{themeOptions[item]}</span>
+              <span className="hidden max-sm:inline" aria-hidden="true">{item === 'light' ? '☼' : '◐'}</span>
             </button>
           ))}
         </div>
-        <div className="language-switch" aria-label={languageLabel}>
+        <div className={switchClass} aria-label={languageLabel}>
           {(['pt-BR', 'en'] as Locale[]).map((item) => (
-            <button key={item} type="button" aria-pressed={locale === item} onClick={() => onLocaleChange(item)}>
-              <span className="nav-full">{item === 'pt-BR' ? 'PT-BR' : 'EN'}</span>
-              <span className="nav-icon" aria-hidden="true">{item === 'pt-BR' ? 'PT' : 'EN'}</span>
+            <button className={switchButtonClass} key={item} type="button" aria-pressed={locale === item} onClick={() => onLocaleChange(item)}>
+              <span>{item === 'pt-BR' ? 'PT-BR' : 'EN'}</span>
             </button>
           ))}
         </div>

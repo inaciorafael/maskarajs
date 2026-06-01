@@ -232,6 +232,120 @@ function selectPattern(patterns, chars, slots = globalSlots, cacheId = 'global',
   return sorted[sorted.length - 1]
 }
 
+function isPatternRule(item) {
+  return item && typeof item === 'object' && !Array.isArray(item) && typeof item.pattern !== 'undefined'
+}
+
+function toPatternList(pattern) {
+  return Array.isArray(pattern) ? pattern : [pattern]
+}
+
+function flattenPatterns(pattern) {
+  const list = toPatternList(pattern)
+  const flattened = []
+
+  for (const item of list) {
+    if (isPatternRule(item)) {
+      flattened.push(...flattenPatterns(item.pattern))
+    } else if (Array.isArray(item)) {
+      flattened.push(...flattenPatterns(item))
+    } else {
+      flattened.push(item)
+    }
+  }
+
+  return flattened
+}
+
+function hasConditionalRules(pattern) {
+  return Array.isArray(pattern) && pattern.some(isPatternRule)
+}
+
+function extractCandidateChars(value, patterns, slots = globalSlots, cacheId = 'global', slotsVersion = globalSlotsVersion) {
+  const allLiterals = new Set()
+  for (const p of flattenPatterns(patterns)) {
+    for (const t of parse(p, slots, cacheId, slotsVersion)) {
+      if (t.type === 'literal') {
+        for (const ch of t.value) allLiterals.add(ch)
+      }
+    }
+  }
+  return Array.from(String(value)).filter(ch => !allLiterals.has(ch))
+}
+
+function resolvePatternList(pattern, value = '', slots = globalSlots, cacheId = 'global', slotsVersion = globalSlotsVersion) {
+  if (!hasConditionalRules(pattern)) return flattenPatterns(pattern)
+
+  const rules = pattern.map(item => isPatternRule(item) ? item : { pattern: item })
+  const raw = extractCandidateChars(value, rules.map(rule => rule.pattern), slots, cacheId, slotsVersion).join('')
+  const matched = rules.find(rule => typeof rule.when === 'function' && rule.when(raw, String(value)))
+  const fallback = rules.find(rule => typeof rule.when !== 'function')
+  return flattenPatterns((matched || fallback || rules[0]).pattern)
+}
+
+function assertPatternRules(pattern, label) {
+  if (!Array.isArray(pattern)) return
+  for (const rule of pattern) {
+    if (!isPatternRule(rule)) continue
+    if (rule.when && typeof rule.when !== 'function') {
+      throw new Error(`${label}: when precisa ser uma função`)
+    }
+    assertPatternRules(rule.pattern, label)
+  }
+}
+
+function hasPatternMap(definition) {
+  return definition?.patterns && typeof definition.patterns === 'object' && !Array.isArray(definition.patterns)
+}
+
+function patternMapValues(patterns) {
+  return Object.values(patterns)
+}
+
+function selectDefinitionPattern(definition, value = '', slots = globalSlots, cacheId = 'global', slotsVersion = globalSlotsVersion) {
+  if (!hasPatternMap(definition)) return definition.pattern
+
+  const raw = extractCandidateChars(value, patternMapValues(definition.patterns), slots, cacheId, slotsVersion).join('')
+  const selected = definition.select(raw, String(value))
+
+  if (!Object.prototype.hasOwnProperty.call(definition.patterns, selected)) {
+    throw new Error(`mask.select: "${String(selected)}" não existe em patterns`)
+  }
+
+  return definition.patterns[selected]
+}
+
+function allDefinitionPatterns(definition) {
+  return hasPatternMap(definition) ? patternMapValues(definition.patterns) : definition.pattern
+}
+
+function assertDefinition(name, definition, label = 'mask.define') {
+  if (!definition || (!definition.pattern && !definition.patterns)) {
+    throw new Error(`${label}: "${name}" precisa de um pattern`)
+  }
+
+  if (definition.pattern && definition.patterns) {
+    throw new Error(`${label}: "${name}" use pattern ou patterns, não ambos`)
+  }
+
+  if (hasPatternMap(definition)) {
+    if (typeof definition.select !== 'function') {
+      throw new Error(`${label}: "${name}" select precisa ser uma função`)
+    }
+    const values = patternMapValues(definition.patterns)
+    if (values.length === 0) {
+      throw new Error(`${label}: "${name}" patterns precisa ter ao menos um pattern`)
+    }
+    for (const pattern of values) assertPatternRules(pattern, `${label}: "${name}"`)
+  } else {
+    assertPatternRules(definition.pattern, `${label}: "${name}"`)
+  }
+
+  if (definition.validate && typeof definition.validate !== 'function') {
+    throw new Error(`${label}: "${name}" validate precisa ser uma função`)
+  }
+}
+
 // ─── Extração e validação de chars de input ────────────────────────────────
 
 /**
@@ -254,7 +368,7 @@ function fullLength(pattern, slots = globalSlots, cacheId = 'global', slotsVersi
 }
 
 function extractInputChars(value, patterns, validate = defaultValidate, slots = globalSlots, cacheId = 'global', slotsVersion = globalSlotsVersion) {
-  const patList = Array.isArray(patterns) ? patterns : [patterns]
+  const patList = flattenPatterns(patterns)
 
   // 1. coleta todos os literais para remover do valor
   const allLiterals = new Set()
@@ -321,10 +435,10 @@ function mask(pattern, value) {
   if (typeof pattern === 'string' && registry.has(pattern)) {
     const entry = registry.get(pattern)
     validate = entry.validate
-    pattern = entry.pattern
+    pattern = selectDefinitionPattern(entry, value, globalSlots, 'global', globalSlotsVersion)
   }
   const str      = String(value)
-  const patterns = Array.isArray(pattern) ? pattern : [pattern]
+  const patterns = resolvePatternList(pattern, str, globalSlots, 'global', globalSlotsVersion)
   const chars    = extractInputChars(str, patterns, validate, globalSlots, 'global', globalSlotsVersion)
   const chosen   = selectPattern(patterns, chars, globalSlots, 'global', globalSlotsVersion)
   return applyTokens(parse(chosen, globalSlots, 'global', globalSlotsVersion), chars)
@@ -353,10 +467,10 @@ mask.raw = function (pattern, value) {
     const entry = registry.get(pattern)
     transform   = entry.transform
     validate    = entry.validate
-    pattern     = entry.pattern
+    pattern     = selectDefinitionPattern(entry, value, globalSlots, 'global', globalSlotsVersion)
   }
 
-  const patterns = Array.isArray(pattern) ? pattern : [pattern]
+  const patterns = resolvePatternList(pattern, String(value), globalSlots, 'global', globalSlotsVersion)
   const raw      = extractInputChars(String(value), patterns, validate, globalSlots, 'global', globalSlotsVersion).join('')
 
   if (!transform) return raw
@@ -378,9 +492,9 @@ mask.is = function (pattern, value) {
   if (typeof pattern === 'string' && registry.has(pattern)) {
     const entry = registry.get(pattern)
     validate = entry.validate
-    pattern = entry.pattern
+    pattern = selectDefinitionPattern(entry, value, globalSlots, 'global', globalSlotsVersion)
   }
-  const patterns = Array.isArray(pattern) ? pattern : [pattern]
+  const patterns = resolvePatternList(pattern, String(value), globalSlots, 'global', globalSlotsVersion)
   const chars    = extractInputChars(String(value), patterns, validate, globalSlots, 'global', globalSlotsVersion)
   return patterns.some(p => chars.length >= inputCount(p, globalSlots, 'global', globalSlotsVersion))
 }
@@ -395,9 +509,10 @@ mask.is = function (pattern, value) {
  */
 mask.hint = function (pattern) {
   if (typeof pattern === 'string' && registry.has(pattern)) {
-    pattern = registry.get(pattern).pattern
+    pattern = selectDefinitionPattern(registry.get(pattern), '', globalSlots, 'global', globalSlotsVersion)
   }
-  const p = Array.isArray(pattern) ? pattern[pattern.length - 1] : pattern
+  const patterns = resolvePatternList(pattern, '', globalSlots, 'global', globalSlotsVersion)
+  const p = patterns[patterns.length - 1]
   return parse(p, globalSlots, 'global', globalSlotsVersion)
     .map(t => {
       if (t.type === 'literal') return t.value
@@ -434,9 +549,9 @@ mask.rawLength = function (pattern, value) {
   if (typeof p === 'string' && registry.has(p)) {
     const entry = registry.get(p)
     validate = entry.validate
-    p = entry.pattern
+    p = selectDefinitionPattern(entry, value, globalSlots, 'global', globalSlotsVersion)
   }
-  const patterns = Array.isArray(p) ? p : [p]
+  const patterns = resolvePatternList(p, String(value), globalSlots, 'global', globalSlotsVersion)
   // Aplica a máscara e conta os chars do resultado — fonte da verdade
   // é o valor mascarado, não o valor bruto (que pode ter chars não validados)
   const masked = mask(p, String(value))
@@ -460,9 +575,9 @@ mask.rawLength = function (pattern, value) {
  */
 mask.patternLength = function (pattern) {
   if (typeof pattern === 'string' && registry.has(pattern)) {
-    pattern = registry.get(pattern).pattern
+    pattern = allDefinitionPatterns(registry.get(pattern))
   }
-  const patterns = Array.isArray(pattern) ? pattern : [pattern]
+  const patterns = flattenPatterns(pattern)
   return Math.max(...patterns.map(p => fullLength(p, globalSlots, 'global', globalSlotsVersion)))
 }
 
@@ -508,10 +623,7 @@ mask.format = function (pattern, value) {
  * })
  */
 mask.define = function (name, definition) {
-  if (!definition?.pattern) throw new Error(`mask.define: "${name}" precisa de um pattern`)
-  if (definition.validate && typeof definition.validate !== 'function') {
-    throw new Error(`mask.define: "${name}" validate precisa ser uma função`)
-  }
+  assertDefinition(name, definition)
   registry.set(name, definition)
 }
 
@@ -590,19 +702,19 @@ mask.slots = function () {
  * }))
  */
 mask.on = function (input, pattern, options = {}) {
-  const { onValue, onMasked } = options
+  const { onValue, onMaskara, onMasked } = options
 
-  function resolvePatterns() {
+  function currentPatterns() {
     let p = pattern
-    if (typeof p === 'string' && registry.has(p)) p = registry.get(p).pattern
-    return Array.isArray(p) ? p : [p]
+    if (typeof p === 'string' && registry.has(p)) p = selectDefinitionPattern(registry.get(p), input.value, globalSlots, 'global', globalSlotsVersion)
+    return resolvePatternList(p, input.value, globalSlots, 'global', globalSlotsVersion)
   }
 
   // Bloqueia keydown quando já no limite máximo —
   // evita o flash de um frame com char excedente antes do handler corrigir
   function onKeydown(e) {
     if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) return
-    const patterns = resolvePatterns()
+    const patterns = currentPatterns()
     let validate
     if (typeof pattern === 'string' && registry.has(pattern)) validate = registry.get(pattern).validate
     const chars    = extractInputChars(e.target.value, patterns, validate, globalSlots, 'global', globalSlotsVersion)
@@ -625,6 +737,7 @@ mask.on = function (input, pattern, options = {}) {
       el.setSelectionRange(pos, pos)
     })
 
+    onMaskara?.(masked)
     onMasked?.(masked)
     onValue?.(mask.raw(pattern, masked))
   }
@@ -702,7 +815,7 @@ mask.create = function (presets = {}) {
 
   // registra presets iniciais
   for (const [name, def] of Object.entries(presets)) {
-    if (!def?.pattern) throw new Error(`mask.create: "${name}" precisa de um pattern`)
+    assertDefinition(name, def, 'mask.create')
     localRegistry.set(name, def)
   }
 
@@ -710,6 +823,20 @@ mask.create = function (presets = {}) {
   function resolveLocal(pattern) {
     if (typeof pattern === 'string' && localRegistry.has(pattern)) {
       return localRegistry.get(pattern).pattern
+    }
+    return pattern
+  }
+
+  function resolveLocalForValue(pattern, value = '') {
+    if (typeof pattern === 'string' && localRegistry.has(pattern)) {
+      return selectDefinitionPattern(localRegistry.get(pattern), value, localSlots, localCacheId, localSlotsVersion)
+    }
+    return pattern
+  }
+
+  function resolveLocalForLength(pattern) {
+    if (typeof pattern === 'string' && localRegistry.has(pattern)) {
+      return allDefinitionPatterns(localRegistry.get(pattern))
     }
     return pattern
   }
@@ -725,8 +852,8 @@ mask.create = function (presets = {}) {
 
   function instance(pattern, value) {
     if (value == null) return ''
-    const p = resolveLocal(pattern)
-    const pats = Array.isArray(p) ? p : [p]
+    const p = resolveLocalForValue(pattern, value)
+    const pats = resolvePatternList(p, String(value), localSlots, localCacheId, localSlotsVersion)
     const chars = extractInputChars(String(value), pats, resolveLocalEntry(pattern)?.validate, localSlots, localCacheId, localSlotsVersion)
     const chosen = selectPattern(pats, chars, localSlots, localCacheId, localSlotsVersion)
     return applyTokens(parse(chosen, localSlots, localCacheId, localSlotsVersion), chars)
@@ -740,9 +867,9 @@ mask.create = function (presets = {}) {
       const entry = localRegistry.get(pattern)
       transform   = entry.transform
       validate    = entry.validate
-      pattern     = entry.pattern
+      pattern     = selectDefinitionPattern(entry, value, localSlots, localCacheId, localSlotsVersion)
     }
-    const pats     = Array.isArray(pattern) ? pattern : [pattern]
+    const pats     = resolvePatternList(pattern, String(value), localSlots, localCacheId, localSlotsVersion)
     const raw      = extractInputChars(String(value), pats, validate, localSlots, localCacheId, localSlotsVersion).join('')
     if (!transform) return raw
     const complete = pats.some(p => raw.length >= inputCount(p, localSlots, localCacheId, localSlotsVersion))
@@ -751,15 +878,16 @@ mask.create = function (presets = {}) {
 
   instance.is = function (pattern, value) {
     if (value == null) return false
-    const p    = resolveLocal(pattern)
-    const pats = Array.isArray(p) ? p : [p]
+    const p    = resolveLocalForValue(pattern, value)
+    const pats = resolvePatternList(p, String(value), localSlots, localCacheId, localSlotsVersion)
     const chars = extractInputChars(String(value), pats, resolveLocalEntry(pattern)?.validate, localSlots, localCacheId, localSlotsVersion)
     return pats.some(pt => chars.length >= inputCount(pt, localSlots, localCacheId, localSlotsVersion))
   }
 
   instance.hint = function (pattern) {
-    const p = resolveLocal(pattern)
-    const pat = Array.isArray(p) ? p[p.length - 1] : p
+    const p = resolveLocalForValue(pattern, '')
+    const pats = resolvePatternList(p, '', localSlots, localCacheId, localSlotsVersion)
+    const pat = pats[pats.length - 1]
     return parse(pat, localSlots, localCacheId, localSlotsVersion).map(t => {
       if (t.type === 'literal') return t.value
       if (t.constraint) {
@@ -776,10 +904,7 @@ mask.create = function (presets = {}) {
   }
 
   instance.define = function (name, definition) {
-    if (!definition?.pattern) throw new Error(`mask.define: "${name}" precisa de um pattern`)
-    if (definition.validate && typeof definition.validate !== 'function') {
-      throw new Error(`mask.define: "${name}" validate precisa ser uma função`)
-    }
+    assertDefinition(name, definition)
     localRegistry.set(name, definition)
   }
 
@@ -793,29 +918,29 @@ mask.create = function (presets = {}) {
 
   instance.rawLength = function (pattern, value) {
     if (value == null) return 0
-    const p = resolveLocal(pattern)
-    const pats = Array.isArray(p) ? p : [p]
+    const p = resolveLocalForValue(pattern, value)
+    const pats = resolvePatternList(p, String(value), localSlots, localCacheId, localSlotsVersion)
     const masked = instance(pattern, String(value))
     return extractInputChars(masked, pats, resolveLocalEntry(pattern)?.validate, localSlots, localCacheId, localSlotsVersion).length
   }
 
   instance.patternLength = function (pattern) {
-    const p = resolveLocal(pattern)
-    const pats = Array.isArray(p) ? p : [p]
+    const p = resolveLocalForLength(pattern)
+    const pats = flattenPatterns(p)
     return Math.max(...pats.map(p => fullLength(p, localSlots, localCacheId, localSlotsVersion)))
   }
 
   instance.on = function (input, pattern, options = {}) {
-    const { onValue, onMasked } = options
+    const { onValue, onMaskara, onMasked } = options
 
-    function resolvePatterns() {
-      const p = resolveLocal(pattern)
-      return Array.isArray(p) ? p : [p]
+    function currentPatterns() {
+      const p = resolveLocalForValue(pattern, input.value)
+      return resolvePatternList(p, input.value, localSlots, localCacheId, localSlotsVersion)
     }
 
     function onKeydown(e) {
       if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) return
-      const pats     = resolvePatterns()
+      const pats     = currentPatterns()
       const chars    = extractInputChars(e.target.value, pats, resolveLocalEntry(pattern)?.validate, localSlots, localCacheId, localSlotsVersion)
       const maxLimit = Math.max(...pats.map(p => inputCount(p, localSlots, localCacheId, localSlotsVersion)))
       if (chars.length >= maxLimit) e.preventDefault()
@@ -832,6 +957,7 @@ mask.create = function (presets = {}) {
         const pos = Math.max(0, cursor + diff)
         el.setSelectionRange(pos, pos)
       })
+      onMaskara?.(masked)
       onMasked?.(masked)
       onValue?.(instance.raw(pattern, masked))
     }
@@ -868,7 +994,9 @@ mask.create = function (presets = {}) {
 
 // ─── Export ────────────────────────────────────────────────────────────────
 
-export { mask }
+const maskara = mask
+
+export { mask, maskara }
 export default mask
 
 // CJS: module.exports = mask

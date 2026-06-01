@@ -4,11 +4,11 @@
  * Tipagens com parâmetro de registry para autocomplete de nomes registrados.
  *
  * Uso básico (sem generics — funciona, sem autocomplete de nomes):
- *   import mask from './mask.js'
- *   mask('cpf', value)
+ *   import maskara from './mask.js'
+ *   maskara('cpf', value)
  *
  * Uso tipado (com autocomplete de nomes):
- *   const m = mask.create<{ cpf: string; date: Date | null; money: number }>({
+ *   const m = maskara.create<{ cpf: string; date: Date | null; money: number }>({
  *     cpf:   { pattern: '###[.]###[.]###[-]##' },
  *     date:  { pattern: '##[/]##[/]####', transform: ... },
  *     money: { pattern: '########[,]##', transform: ... },
@@ -21,41 +21,79 @@
 
 // ─── Primitivos ───────────────────────────────────────────────────────────
 
-/** String de padrão declarativo ou array para padrões dinâmicos */
-export type MaskPattern = string | string[]
+/** Regra condicional para escolher um pattern a partir do raw digitado */
+export interface MaskPatternRule {
+  pattern: string | string[]
+  when?: (raw: string, value: string) => boolean
+}
+export type MaskaraPatternRule = MaskPatternRule
+
+/** Mapa de patterns usado por máscaras nomeadas condicionais */
+export type MaskPatternMap = Record<string, string | string[]>
+export type MaskaraPatternMap = MaskPatternMap
+
+/** Função que escolhe uma chave de patterns a partir do valor digitado */
+export type MaskSelect<K extends string = string> = (raw: string, value: string) => K
+export type MaskaraSelect<K extends string = string> = MaskSelect<K>
+
+/** String de padrão declarativo, array dinâmico ou array de regras condicionais */
+export type MaskPattern = string | string[] | MaskPatternRule[]
+export type MaskaraPattern = MaskPattern
 
 /** Função de transformação — recebe (raw, masked, complete) e retorna T */
 export type MaskTransform<T> = (raw: string, masked: string, complete: boolean) => T
+export type MaskaraTransform<T> = MaskTransform<T>
 
 /** Validação incremental — retorna false para recusar o próximo caractere */
 export type MaskValidate = (raw: string, masked: string, complete: boolean) => boolean
+export type MaskaraValidate = MaskValidate
 
 /** Predicado usado por um slot customizado */
 export type MaskSlotTest = (ch: string) => boolean
+export type MaskaraSlotTest = MaskSlotTest
 
 /** Definição completa de um slot customizado */
 export interface MaskSlotDefinition {
   test: MaskSlotTest
   hint?: string
 }
+export type MaskaraSlotDefinition = MaskSlotDefinition
 
 /** Formas aceitas para registrar um slot customizado */
 export type MaskSlotInput = MaskSlotTest | RegExp | MaskSlotDefinition
+export type MaskaraSlotInput = MaskSlotInput
 
-/** Definição de uma máscara nomeada */
-export interface MaskDefinition<T = string> {
+/** Definição de uma máscara nomeada com pattern único ou array dinâmico */
+export interface MaskPatternDefinition<T = string> {
   pattern: MaskPattern
   transform?: MaskTransform<T>
   validate?: MaskValidate
 }
+export type MaskaraPatternDefinition<T = string> = MaskPatternDefinition<T>
+
+/** Definição de uma máscara nomeada que seleciona um pattern por raw/value */
+export interface MaskConditionalDefinition<T = string, K extends string = string> {
+  patterns: Record<K, MaskPattern>
+  select: MaskSelect<K>
+  transform?: MaskTransform<T>
+  validate?: MaskValidate
+}
+export type MaskaraConditionalDefinition<T = string, K extends string = string> = MaskConditionalDefinition<T, K>
+
+/** Definição de uma máscara nomeada */
+export type MaskDefinition<T = string> = MaskPatternDefinition<T> | MaskConditionalDefinition<T>
+export type MaskaraDefinition<T = string> = MaskDefinition<T>
 
 /** Opções de mask.on */
 export interface MaskOnOptions<T> {
   /** Chamado a cada keystroke com o valor limpo / resultado do transform */
   onValue?: (value: T) => void
+  /** Chamado a cada keystroke com o valor mascarado (display). Nome preferido. */
+  onMaskara?: (masked: string) => void
   /** Chamado a cada keystroke com o valor mascarado (display) */
   onMasked?: (masked: string) => void
 }
+export type MaskaraOnOptions<T> = MaskOnOptions<T>
 
 // ─── Registry map ─────────────────────────────────────────────────────────
 //
@@ -195,6 +233,7 @@ export interface MaskInstance<R extends Record<string, unknown> = Record<string,
     presets?: { [K in keyof S]: MaskDefinition<S[K]> }
   ): MaskInstance<S>
 }
+export type MaskaraInstance<R extends Record<string, unknown> = Record<string, string>> = MaskInstance<R>
 
 // ─── Função principal (registry global, sem generics de nome) ─────────────
 
@@ -287,5 +326,8 @@ export declare namespace mask {
     presets?: { [K in keyof R]: MaskDefinition<R[K]> }
   ): MaskInstance<R>
 }
+
+/** Preferred alias for the main engine. `mask` remains available for compatibility. */
+export declare const maskara: typeof mask
 
 export default mask

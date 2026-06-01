@@ -1,9 +1,9 @@
 'use strict'
 
 const React = require('react')
-const mask = require('./mask.cjs.js')
+const maskara = require('./mask.cjs.js')
 
-const MaskEngineContext = React.createContext(mask)
+const MaskaraEngineContext = React.createContext(maskara)
 
 function readInputValue(eventOrValue) {
   if (eventOrValue && typeof eventOrValue === 'object' && 'target' in eventOrValue) {
@@ -12,8 +12,8 @@ function readInputValue(eventOrValue) {
   return eventOrValue ?? ''
 }
 
-function useMask(pattern, options = {}) {
-  const contextEngine = React.useContext(MaskEngineContext)
+function useMaskara(pattern, options = {}) {
+  const contextEngine = React.useContext(MaskaraEngineContext)
   const engine = options.engine ?? contextEngine
   const hasControlledValue = Object.prototype.hasOwnProperty.call(options, 'value')
   const [internalValue, setInternalValue] = React.useState(() => engine(pattern, options.defaultValue ?? ''))
@@ -27,6 +27,7 @@ function useMask(pattern, options = {}) {
     const nextMasked = engine(pattern, nextValue ?? '')
     if (!hasControlledValue) setInternalValue(nextMasked)
     options.onMasked?.(nextMasked)
+    options.onMaskara?.(nextMasked)
     options.onValue?.(engine.raw(pattern, nextMasked))
     return nextMasked
   }, [engine, hasControlledValue, options, pattern])
@@ -65,17 +66,24 @@ function useMask(pattern, options = {}) {
   }
 }
 
-function useMaskEngine() {
-  return React.useContext(MaskEngineContext)
+function useMaskaraEngine() {
+  return React.useContext(MaskaraEngineContext)
 }
 
-function MaskProvider({ engine, children }) {
-  return React.createElement(MaskEngineContext.Provider, { value: engine ?? mask }, children)
+function MaskaraProvider({ engine, children }) {
+  return React.createElement(MaskaraEngineContext.Provider, { value: engine ?? maskara }, children)
 }
+
+const useMask = useMaskara
+const useMaskEngine = useMaskaraEngine
+const MaskProvider = MaskaraProvider
 
 module.exports = {
+  MaskaraProvider,
   MaskProvider,
+  useMaskara,
   useMask,
+  useMaskaraEngine,
   useMaskEngine,
-  default: useMask,
+  default: useMaskara,
 }

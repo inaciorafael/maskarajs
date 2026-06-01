@@ -1,7 +1,7 @@
 import { createContext, createElement, useCallback, useContext, useMemo, useState } from 'react'
-import mask from '../../mask.mjs'
+import maskara from '../../mask.mjs'
 
-const MaskEngineContext = createContext(mask)
+const MaskaraEngineContext = createContext(maskara)
 
 function readInputValue(eventOrValue) {
   if (eventOrValue && typeof eventOrValue === 'object' && 'target' in eventOrValue) {
@@ -10,8 +10,8 @@ function readInputValue(eventOrValue) {
   return eventOrValue ?? ''
 }
 
-export function useMask(pattern, options = {}) {
-  const contextEngine = useContext(MaskEngineContext)
+export function useMaskara(pattern, options = {}) {
+  const contextEngine = useContext(MaskaraEngineContext)
   const engine = options.engine ?? contextEngine
   const hasControlledValue = Object.prototype.hasOwnProperty.call(options, 'value')
   const [internalValue, setInternalValue] = useState(() => engine(pattern, options.defaultValue ?? ''))
@@ -25,6 +25,7 @@ export function useMask(pattern, options = {}) {
     const nextMasked = engine(pattern, nextValue ?? '')
     if (!hasControlledValue) setInternalValue(nextMasked)
     options.onMasked?.(nextMasked)
+    options.onMaskara?.(nextMasked)
     options.onValue?.(engine.raw(pattern, nextMasked))
     return nextMasked
   }, [engine, hasControlledValue, options, pattern])
@@ -63,12 +64,17 @@ export function useMask(pattern, options = {}) {
   }
 }
 
-export function useMaskEngine() {
-  return useContext(MaskEngineContext)
+export function useMaskaraEngine() {
+  return useContext(MaskaraEngineContext)
 }
 
-export function MaskProvider({ engine, children }) {
-  return createElement(MaskEngineContext.Provider, { value: engine ?? mask }, children)
+export function MaskaraProvider({ engine, children }) {
+  return createElement(MaskaraEngineContext.Provider, { value: engine ?? maskara }, children)
 }
 
-export default useMask
+const useMask = useMaskara
+const useMaskEngine = useMaskaraEngine
+const MaskProvider = MaskaraProvider
+
+export { MaskProvider, useMask, useMaskEngine }
+export default useMaskara

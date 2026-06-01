@@ -7,6 +7,10 @@ import type { Locale } from './TopNav'
 
 const PIX_KEY = 'a278d104-0d88-438c-aef8-c7fa4a894cc1'
 
+function cn(...classes: Array<string | false | null | undefined>) {
+  return classes.filter(Boolean).join(' ')
+}
+
 const donationCopy = {
   'pt-BR': {
     close: 'Fechar popup de doacao',
@@ -77,39 +81,39 @@ export function DonationSupport({ locale, open, onClose }: DonationSupportProps)
   }
 
   return (
-    <div className="donation-overlay" role="presentation" onMouseDown={onClose}>
-      <section className="donation-popup" role="dialog" aria-modal="true" aria-labelledby={titleId} onMouseDown={(event) => event.stopPropagation()}>
-        <button className="donation-close" type="button" aria-label={t.close} onClick={onClose}>
+    <div className="fixed inset-0 z-50 grid place-items-center overflow-auto bg-ink/50 p-4 backdrop-blur-sm" role="presentation" onMouseDown={onClose}>
+      <section className="relative grid w-[min(980px,100%)] gap-5 rounded-xl border border-line bg-surface p-5 text-ink shadow-[0_30px_90px_rgb(0_0_0_/_28%)]" role="dialog" aria-modal="true" aria-labelledby={titleId} onMouseDown={(event) => event.stopPropagation()}>
+        <button className="absolute right-3 top-3 grid size-[34px] place-items-center rounded-full border border-line bg-surface font-black text-ink" type="button" aria-label={t.close} onClick={onClose}>
           x
         </button>
 
-        <div className="donation-copy">
-          <span>{t.eyebrow}</span>
-          <h2 id={titleId}>{t.title}</h2>
-          <p>{t.body}</p>
+        <div className="grid gap-2.5 pr-9">
+          <span className="w-fit rounded-full bg-language-slot px-2.5 py-1.5 text-xs font-black uppercase text-[var(--language-slot-ink)]">{t.eyebrow}</span>
+          <h2 className="m-0 max-w-[760px] text-[clamp(30px,4vw,50px)] leading-none text-ink" id={titleId}>{t.title}</h2>
+          <p className="m-0 max-w-[760px] leading-[1.55] text-muted">{t.body}</p>
         </div>
 
-        <div className="donation-layout">
-          <div className="donation-tiers" aria-label={t.eyebrow}>
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(300px,0.75fr)]">
+          <div className="grid gap-2 sm:grid-cols-2" aria-label={t.eyebrow}>
             {t.tiers.map(([amount, title, description], index) => (
-              <button className={selectedIndex === index ? 'selected' : ''} key={title} type="button" aria-pressed={selectedIndex === index} onClick={() => setSelectedIndex(index)}>
-                {index === 1 ? <small>{t.popular}</small> : null}
-                <strong>{amount}</strong>
-                <span>{title}</span>
-                <p>{description}</p>
+              <button className={cn('grid min-h-36 content-start gap-1.5 rounded-lg border border-line bg-surface p-4 text-left shadow-maskara-soft', selectedIndex === index && 'border-teal bg-[linear-gradient(180deg,color-mix(in_srgb,var(--teal)_12%,var(--surface)),var(--surface))]')} key={title} type="button" aria-pressed={selectedIndex === index} onClick={() => setSelectedIndex(index)}>
+                {index === 1 ? <small className="w-fit rounded-full bg-language-slot px-2 py-1 text-[11px] font-black uppercase text-[var(--language-slot-ink)]">{t.popular}</small> : null}
+                <strong className="text-3xl text-teal">{amount}</strong>
+                <span className="font-black text-ink">{title}</span>
+                <p className="m-0 text-sm leading-[1.4] text-muted">{description}</p>
               </button>
             ))}
           </div>
 
-          <div className="donation-payment">
-            <div className="donation-qr">
-              <img src={selectedQr} alt={`${t.selected}: ${selectedTier[0]}`} />
+          <div className="grid content-start gap-4 rounded-lg border border-line bg-surface-soft p-4">
+            <div className="mx-auto grid aspect-square w-[min(260px,100%)] place-items-center rounded-lg border border-line bg-white p-3">
+              <img className="h-full w-full object-contain" src={selectedQr} alt={`${t.selected}: ${selectedTier[0]}`} />
             </div>
-            <div>
-              <strong>{t.selected}: {selectedTier[0]}</strong>
-              <p>{isCustom ? t.customNote : selectedTier[2]}</p>
-              <code>{PIX_KEY}</code>
-              <button type="button" onClick={copyPixKey}>
+            <div className="grid gap-2">
+              <strong className="text-ink">{t.selected}: {selectedTier[0]}</strong>
+              <p className="m-0 text-sm leading-[1.45] text-muted">{isCustom ? t.customNote : selectedTier[2]}</p>
+              <code className="block [overflow-wrap:anywhere]">{PIX_KEY}</code>
+              <button className="min-h-11 rounded-lg bg-ink px-4 font-black text-ink-contrast" type="button" onClick={copyPixKey}>
                 {copied ? t.copied : t.copy}
               </button>
             </div>
