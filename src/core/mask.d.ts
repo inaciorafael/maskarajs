@@ -95,6 +95,76 @@ export interface MaskOnOptions<T> {
 }
 export type MaskaraOnOptions<T> = MaskOnOptions<T>
 
+/** Resultado rico de apply(), útil para forms, debug e adapters */
+export interface MaskApplyResult<T = string> {
+  /** Valor mascarado pronto para exibir no input */
+  value: string
+  /** Alias explícito de value */
+  masked: string
+  /** Valor limpo ou transformado por transform */
+  raw: T
+  /** Se o valor preenche completamente a máscara */
+  complete: boolean
+  /** Placeholder gerado a partir do pattern */
+  hint: string
+  /** Alias semântico de hint */
+  placeholder: string
+  /** Quantidade de caracteres de input preenchidos */
+  rawLength: number
+  /** Comprimento total do valor mascarado completo */
+  patternLength: number
+}
+export type MaskaraApplyResult<T = string> = MaskApplyResult<T>
+
+/** Valor aceito pelos handlers de field(): string direta ou evento de input */
+export type MaskFieldInput = string | null | undefined | { target: { value: string } }
+export type MaskaraFieldInput = MaskFieldInput
+
+/** Estado mutável e framework-agnostic para um campo mascarado */
+export interface MaskField<T = string> extends MaskApplyResult<T> {
+  /** Pattern literal ou nome usado por este campo */
+  pattern: MaskPattern
+  /** Aplica um novo valor e atualiza o estado do field */
+  set(value: MaskFieldInput): MaskApplyResult<T>
+  /** Alias de set(), conveniente para inputs controlados */
+  onChange(value: MaskFieldInput): MaskApplyResult<T>
+  /** Alias de set(), conveniente para eventos nativos */
+  onInput(value: MaskFieldInput): MaskApplyResult<T>
+  /** Limpa ou troca o valor atual */
+  reset(value?: string | null | undefined): MaskApplyResult<T>
+  /** Props mínimas para plugar em inputs quando fizer sentido */
+  readonly inputProps: {
+    value: string
+    placeholder: string
+    onChange: (value: MaskFieldInput) => MaskApplyResult<T>
+    onInput: (value: MaskFieldInput) => MaskApplyResult<T>
+  }
+}
+export type MaskaraField<T = string> = MaskField<T>
+
+export type MaskCheckReason = 'complete' | 'empty' | 'invalid' | 'incomplete'
+export type MaskaraCheckReason = MaskCheckReason
+
+/** Resultado de check(), útil para feedback de forms e debug */
+export interface MaskCheckResult<T = string> extends MaskApplyResult<T> {
+  valid: boolean
+  reason: MaskCheckReason
+  message: string
+  expectedLength: number
+  missing: number
+}
+export type MaskaraCheckResult<T = string> = MaskCheckResult<T>
+
+/** Opções de criação de instância */
+export interface MaskCreateOptions {
+  /**
+   * Quando true, o engine para no primeiro caractere inválido.
+   * O padrão é false para preservar o comportamento tolerante de paste.
+   */
+  strict?: boolean
+}
+export type MaskaraCreateOptions = MaskCreateOptions
+
 // ─── Registry map ─────────────────────────────────────────────────────────
 //
 // R = Record dos nomes registrados com seus tipos de retorno do transform.
@@ -109,11 +179,11 @@ export type MaskaraOnOptions<T> = MaskOnOptions<T>
 // Usado para inferir o tipo de retorno de raw() a partir do nome.
 
 /** Extrai o tipo de retorno de raw() para um nome de máscara */
-type RawReturn<R extends Record<string, unknown>, K extends keyof R | MaskPattern> =
+type RawReturn<R extends object, K extends keyof R | MaskPattern> =
   K extends keyof R ? R[K] : string
 
 /** Union de nomes registrados + MaskPattern (para aceitar padrão literal também) */
-type PatternOrName<R extends Record<string, unknown>> = keyof R | MaskPattern
+type PatternOrName<R extends object> = keyof R | MaskPattern
 
 // ─── MaskInstance ─────────────────────────────────────────────────────────
 
@@ -123,7 +193,7 @@ type PatternOrName<R extends Record<string, unknown>> = keyof R | MaskPattern
  * R = mapa de nomes para tipos de retorno do transform.
  * Autocomplete sugere os nomes registrados em todos os métodos.
  */
-export interface MaskInstance<R extends Record<string, unknown> = Record<string, string>> {
+export interface MaskInstance<R extends object = Record<string, string>> {
 
   /**
    * Aplica máscara — retorna string formatada para exibição.
@@ -144,6 +214,38 @@ export interface MaskInstance<R extends Record<string, unknown> = Record<string,
     pattern: K,
     value: string | null | undefined
   ): RawReturn<R, K>
+
+  /**
+   * Alias semântico de raw(), útil para deixar claro que o valor está sendo desmascarado.
+   */
+  unmask<K extends PatternOrName<R>>(
+    pattern: K,
+    value: string | null | undefined
+  ): RawReturn<R, K>
+
+  /**
+   * Aplica a máscara e retorna todos os metadados úteis em uma única chamada.
+   */
+  apply<K extends PatternOrName<R>>(
+    pattern: K,
+    value: string | null | undefined
+  ): MaskApplyResult<RawReturn<R, K>>
+
+  /**
+   * Cria um estado simples para campos mascarados.
+   */
+  field<K extends PatternOrName<R>>(
+    pattern: K,
+    initialValue?: string | null | undefined
+  ): MaskField<RawReturn<R, K>>
+
+  /**
+   * Aplica a máscara e explica se o valor está completo, vazio, inválido ou incompleto.
+   */
+  check<K extends PatternOrName<R>>(
+    pattern: K,
+    value: string | null | undefined
+  ): MaskCheckResult<RawReturn<R, K>>
 
   /**
    * Verifica se o valor preenche completamente o padrão.
@@ -229,11 +331,12 @@ export interface MaskInstance<R extends Record<string, unknown> = Record<string,
   ): () => void
 
   /** Cria uma sub-instância com registry próprio */
-  create<S extends Record<string, unknown>>(
-    presets?: { [K in keyof S]: MaskDefinition<S[K]> }
+  create<S extends object>(
+    presets?: { [K in keyof S]: MaskDefinition<S[K]> },
+    options?: MaskCreateOptions
   ): MaskInstance<S>
 }
-export type MaskaraInstance<R extends Record<string, unknown> = Record<string, string>> = MaskInstance<R>
+export type MaskaraInstance<R extends object = Record<string, string>> = MaskInstance<R>
 
 // ─── Função principal (registry global, sem generics de nome) ─────────────
 
@@ -250,6 +353,27 @@ export declare namespace mask {
 
   /** Retorna o raw value / resultado do transform */
   function raw<T = string>(pattern: MaskPattern, value: string | null | undefined): T
+
+  /** Alias semântico de raw() */
+  function unmask<T = string>(pattern: MaskPattern, value: string | null | undefined): T
+
+  /** Aplica máscara e retorna valor, raw, complete, hint e métricas em uma chamada */
+  function apply<T = string>(
+    pattern: MaskPattern,
+    value: string | null | undefined
+  ): MaskApplyResult<T>
+
+  /** Cria um estado simples para campos mascarados */
+  function field<T = string>(
+    pattern: MaskPattern,
+    initialValue?: string | null | undefined
+  ): MaskField<T>
+
+  /** Aplica a máscara e explica o estado do valor */
+  function check<T = string>(
+    pattern: MaskPattern,
+    value: string | null | undefined
+  ): MaskCheckResult<T>
 
   /** Verifica se o valor preenche completamente o padrão */
   function is(pattern: MaskPattern, value: string | null | undefined): boolean
@@ -322,8 +446,9 @@ export declare namespace mask {
    *   onValue: date => ...  // date: Date | null ✓ (inferido)
    * })
    */
-  function create<R extends Record<string, unknown> = {}>(
-    presets?: { [K in keyof R]: MaskDefinition<R[K]> }
+  function create<R extends object = {}>(
+    presets?: { [K in keyof R]: MaskDefinition<R[K]> },
+    options?: MaskCreateOptions
   ): MaskInstance<R>
 }
 

@@ -360,6 +360,100 @@ function defaultValidate() {
   return true
 }
 
+function readFieldValue(valueOrEvent) {
+  if (valueOrEvent && typeof valueOrEvent === 'object' && valueOrEvent.target && 'value' in valueOrEvent.target) {
+    return valueOrEvent.target.value
+  }
+  return valueOrEvent
+}
+
+function assignFieldState(field, result) {
+  field.value = result.value
+  field.masked = result.masked
+  field.raw = result.raw
+  field.complete = result.complete
+  field.hint = result.hint
+  field.placeholder = result.placeholder
+  field.rawLength = result.rawLength
+  field.patternLength = result.patternLength
+}
+
+function createFieldApi(engine, pattern, initialValue = '') {
+  const field = {
+    pattern,
+    value: '',
+    masked: '',
+    raw: '',
+    complete: false,
+    hint: '',
+    placeholder: '',
+    rawLength: 0,
+    patternLength: engine.patternLength(pattern),
+    set(valueOrEvent) {
+      const value = readFieldValue(valueOrEvent)
+      const result = engine.apply(pattern, value)
+      assignFieldState(field, result)
+      if (valueOrEvent && typeof valueOrEvent === 'object' && valueOrEvent.target && 'value' in valueOrEvent.target) {
+        valueOrEvent.target.value = result.value
+      }
+      return result
+    },
+    onChange(valueOrEvent) {
+      return field.set(valueOrEvent)
+    },
+    onInput(valueOrEvent) {
+      return field.set(valueOrEvent)
+    },
+    reset(value = '') {
+      return field.set(value)
+    },
+  }
+
+  Object.defineProperty(field, 'inputProps', {
+    enumerable: true,
+    get() {
+      return {
+        value: field.value,
+        placeholder: field.placeholder,
+        onChange: field.onChange,
+        onInput: field.onInput,
+      }
+    },
+  })
+
+  field.set(initialValue)
+  return field
+}
+
+function buildCheckResult(result, value, candidateLength) {
+  const hasValue = value != null && String(value).length > 0
+  const rejected = candidateLength > result.rawLength
+  const valid = result.complete && !rejected
+  const reason = valid
+    ? 'complete'
+    : !hasValue
+      ? 'empty'
+      : rejected
+        ? 'invalid'
+        : 'incomplete'
+
+  const messages = {
+    complete: 'Value matches the mask.',
+    empty: 'Value is empty.',
+    invalid: 'Value contains characters or sequences rejected by the mask.',
+    incomplete: 'Value does not complete the mask yet.',
+  }
+
+  return {
+    ...result,
+    valid,
+    reason,
+    message: messages[reason],
+    expectedLength: result.patternLength,
+    missing: Math.max(result.patternLength - result.value.length, 0),
+  }
+}
+
 function fullLength(pattern, slots = globalSlots, cacheId = 'global', slotsVersion = globalSlotsVersion) {
   return parse(pattern, slots, cacheId, slotsVersion).reduce((total, token) => {
     if (token.type === 'literal') return total + token.value.length
@@ -367,7 +461,7 @@ function fullLength(pattern, slots = globalSlots, cacheId = 'global', slotsVersi
   }, 0)
 }
 
-function extractInputChars(value, patterns, validate = defaultValidate, slots = globalSlots, cacheId = 'global', slotsVersion = globalSlotsVersion) {
+function extractInputChars(value, patterns, validate = defaultValidate, slots = globalSlots, cacheId = 'global', slotsVersion = globalSlotsVersion, strict = false) {
   const patList = flattenPatterns(patterns)
 
   // 1. coleta todos os literais para remover do valor
@@ -402,6 +496,8 @@ function extractInputChars(value, patterns, validate = defaultValidate, slots = 
       if (!validate(nextRaw, nextMasked, complete)) break
       valid.push(ch)
       ti++
+    } else if (strict) {
+      break
     }
     // char inválido para este slot → descartado silenciosamente
   }
@@ -478,6 +574,14 @@ mask.raw = function (pattern, value) {
   const complete = patterns.some(p => raw.length >= inputCount(p, globalSlots, 'global', globalSlotsVersion))
   return transform(raw, mask(pattern, value), complete)
 }
+
+/**
+ * mask.unmask(pattern, value) — alias semântico de mask.raw()
+ *
+ * Útil quando a intenção no código é deixar explícito que o valor está sendo
+ * desmascarado para persistência, envio para API ou comparação.
+ */
+mask.unmask = mask.raw
 
 /**
  * mask.is(pattern, value) — verifica se o valor preenche o padrão completamente
@@ -594,6 +698,63 @@ mask.patternLength = function (pattern) {
  */
 mask.format = function (pattern, value) {
   return mask(pattern, value)
+}
+
+/**
+ * mask.apply(pattern, value) — aplica máscara e retorna resultado rico
+ *
+ * Reúne as chamadas mais comuns em uma só resposta, sem mudar a API simples.
+ *
+ * @example
+ * mask.apply('cpf', '12345678909')
+ * // {
+ * //   value: '123.456.789-09',
+ * //   masked: '123.456.789-09',
+ * //   raw: '12345678909',
+ * //   complete: true,
+ * //   hint: '000.000.000-00',
+ * //   placeholder: '000.000.000-00',
+ * //   rawLength: 11,
+ * //   patternLength: 14
+ * // }
+ */
+mask.apply = function (pattern, value) {
+  const masked = mask(pattern, value)
+  const hint = mask.hint(pattern)
+  return {
+    value: masked,
+    masked,
+    raw: mask.raw(pattern, masked),
+    complete: mask.is(pattern, masked),
+    hint,
+    placeholder: hint,
+    rawLength: mask.rawLength(pattern, masked),
+    patternLength: mask.patternLength(pattern),
+  }
+}
+
+/**
+ * mask.field(pattern, initialValue?) — estado simples para campos mascarados
+ *
+ * Ajuda em UIs leves, demos, web components e integrações manuais sem exigir
+ * um framework específico.
+ */
+mask.field = function (pattern, initialValue = '') {
+  return createFieldApi(mask, pattern, initialValue)
+}
+
+/**
+ * mask.check(pattern, value) — aplica a máscara e explica o estado do campo
+ */
+mask.check = function (pattern, value) {
+  const result = mask.apply(pattern, value)
+  let p = pattern
+  if (typeof p === 'string' && registry.has(p)) {
+    p = selectDefinitionPattern(registry.get(p), value ?? '', globalSlots, 'global', globalSlotsVersion)
+  }
+  const patterns = resolvePatternList(p, String(value ?? ''), globalSlots, 'global', globalSlotsVersion)
+  const candidateLength = extractCandidateChars(String(value ?? ''), patterns, globalSlots, 'global', globalSlotsVersion).length
+  return buildCheckResult(result, value, candidateLength)
 }
 
 /**
@@ -806,12 +967,13 @@ mask.on = function (input, pattern, options = {}) {
  * maskUS.names() // → ['ssn', 'zip', 'phone', 'date']  (sem 'rg')
  * mask.names()   // → []  (global intocada)
  */
-mask.create = function (presets = {}) {
+mask.create = function (presets = {}, options = {}) {
   // registry isolado para esta instância
   const localRegistry = new Map()
   const localSlots = { ...globalSlots }
   const localCacheId = `local-${++slotLanguageSeq}`
   let localSlotsVersion = globalSlotsVersion
+  const strict = Boolean(options.strict)
 
   // registra presets iniciais
   for (const [name, def] of Object.entries(presets)) {
@@ -854,7 +1016,7 @@ mask.create = function (presets = {}) {
     if (value == null) return ''
     const p = resolveLocalForValue(pattern, value)
     const pats = resolvePatternList(p, String(value), localSlots, localCacheId, localSlotsVersion)
-    const chars = extractInputChars(String(value), pats, resolveLocalEntry(pattern)?.validate, localSlots, localCacheId, localSlotsVersion)
+    const chars = extractInputChars(String(value), pats, resolveLocalEntry(pattern)?.validate, localSlots, localCacheId, localSlotsVersion, strict)
     const chosen = selectPattern(pats, chars, localSlots, localCacheId, localSlotsVersion)
     return applyTokens(parse(chosen, localSlots, localCacheId, localSlotsVersion), chars)
   }
@@ -870,17 +1032,19 @@ mask.create = function (presets = {}) {
       pattern     = selectDefinitionPattern(entry, value, localSlots, localCacheId, localSlotsVersion)
     }
     const pats     = resolvePatternList(pattern, String(value), localSlots, localCacheId, localSlotsVersion)
-    const raw      = extractInputChars(String(value), pats, validate, localSlots, localCacheId, localSlotsVersion).join('')
+    const raw      = extractInputChars(String(value), pats, validate, localSlots, localCacheId, localSlotsVersion, strict).join('')
     if (!transform) return raw
     const complete = pats.some(p => raw.length >= inputCount(p, localSlots, localCacheId, localSlotsVersion))
     return transform(raw, instance(pattern, value), complete)
   }
 
+  instance.unmask = instance.raw
+
   instance.is = function (pattern, value) {
     if (value == null) return false
     const p    = resolveLocalForValue(pattern, value)
     const pats = resolvePatternList(p, String(value), localSlots, localCacheId, localSlotsVersion)
-    const chars = extractInputChars(String(value), pats, resolveLocalEntry(pattern)?.validate, localSlots, localCacheId, localSlotsVersion)
+    const chars = extractInputChars(String(value), pats, resolveLocalEntry(pattern)?.validate, localSlots, localCacheId, localSlotsVersion, strict)
     return pats.some(pt => chars.length >= inputCount(pt, localSlots, localCacheId, localSlotsVersion))
   }
 
@@ -903,6 +1067,33 @@ mask.create = function (presets = {}) {
     return instance(pattern, value)
   }
 
+  instance.apply = function (pattern, value) {
+    const masked = instance(pattern, value)
+    const hint = instance.hint(pattern)
+    return {
+      value: masked,
+      masked,
+      raw: instance.raw(pattern, masked),
+      complete: instance.is(pattern, masked),
+      hint,
+      placeholder: hint,
+      rawLength: instance.rawLength(pattern, masked),
+      patternLength: instance.patternLength(pattern),
+    }
+  }
+
+  instance.field = function (pattern, initialValue = '') {
+    return createFieldApi(instance, pattern, initialValue)
+  }
+
+  instance.check = function (pattern, value) {
+    const result = instance.apply(pattern, value)
+    const p = resolveLocalForValue(pattern, value ?? '')
+    const pats = resolvePatternList(p, String(value ?? ''), localSlots, localCacheId, localSlotsVersion)
+    const candidateLength = extractCandidateChars(String(value ?? ''), pats, localSlots, localCacheId, localSlotsVersion).length
+    return buildCheckResult(result, value, candidateLength)
+  }
+
   instance.define = function (name, definition) {
     assertDefinition(name, definition)
     localRegistry.set(name, definition)
@@ -921,7 +1112,7 @@ mask.create = function (presets = {}) {
     const p = resolveLocalForValue(pattern, value)
     const pats = resolvePatternList(p, String(value), localSlots, localCacheId, localSlotsVersion)
     const masked = instance(pattern, String(value))
-    return extractInputChars(masked, pats, resolveLocalEntry(pattern)?.validate, localSlots, localCacheId, localSlotsVersion).length
+    return extractInputChars(masked, pats, resolveLocalEntry(pattern)?.validate, localSlots, localCacheId, localSlotsVersion, strict).length
   }
 
   instance.patternLength = function (pattern) {
@@ -941,7 +1132,7 @@ mask.create = function (presets = {}) {
     function onKeydown(e) {
       if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) return
       const pats     = currentPatterns()
-      const chars    = extractInputChars(e.target.value, pats, resolveLocalEntry(pattern)?.validate, localSlots, localCacheId, localSlotsVersion)
+      const chars    = extractInputChars(e.target.value, pats, resolveLocalEntry(pattern)?.validate, localSlots, localCacheId, localSlotsVersion, strict)
       const maxLimit = Math.max(...pats.map(p => inputCount(p, localSlots, localCacheId, localSlotsVersion)))
       if (chars.length >= maxLimit) e.preventDefault()
     }

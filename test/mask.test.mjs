@@ -2,10 +2,14 @@ import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import maskara, { mask, maskara as namedMaskara } from '../src/core/mask.mjs'
 import maskaraDirective, { createMaskaraDirective, createMaskaraPlugin, vMaskara } from '../src/adapters/vue/index.mjs'
+import payment from '../src/presets/payment.mjs'
+import datePreset from '../src/presets/date.mjs'
 
 const require = createRequire(import.meta.url)
 const cjsMaskara = require('../src/core/mask.cjs.js')
 const cjsVue = require('../src/adapters/vue/index.cjs.js')
+const cjsPayment = require('../src/presets/payment.cjs.js')
+const cjsDatePreset = require('../src/presets/date.cjs.js')
 
 const test = (name, fn) => {
   try {
@@ -32,6 +36,7 @@ test('applies a single pattern and strips literals in raw', () => {
   const cpf = '###[.]###[.]###[-]##'
   assert.equal(maskara(cpf, '12345678909'), '123.456.789-09')
   assert.equal(maskara.raw(cpf, '123.456.789-09'), '12345678909')
+  assert.equal(maskara.unmask(cpf, '123.456.789-09'), '12345678909')
   assert.equal(maskara.is(cpf, '123.456.789-09'), true)
   assert.equal(maskara.hint(cpf), '000.000.000-00')
   assert.equal(maskara.rawLength(cpf, '123.456'), 6)
@@ -68,6 +73,96 @@ test('supports validate and transform on named masks', () => {
 
   maskara.undefine('testMonth')
   maskara.undefine('testMoney')
+})
+
+test('supports apply with rich metadata', () => {
+  const cpf = '###[.]###[.]###[-]##'
+  assert.deepEqual(maskara.apply(cpf, '12345678909'), {
+    value: '123.456.789-09',
+    masked: '123.456.789-09',
+    raw: '12345678909',
+    complete: true,
+    hint: '000.000.000-00',
+    placeholder: '000.000.000-00',
+    rawLength: 11,
+    patternLength: 14,
+  })
+
+  maskara.define('testApplyMoney', {
+    pattern: '########[,]##',
+    transform: raw => Number.parseInt(raw || '0', 10) / 100,
+  })
+
+  const money = maskara.apply('testApplyMoney', '129990')
+  assert.equal(money.masked, '129990')
+  assert.equal(money.value, money.masked)
+  assert.equal(money.raw, 1299.9)
+  assert.equal(money.complete, false)
+  assert.equal(money.hint, '00000000,00')
+  assert.equal(money.placeholder, money.hint)
+  assert.equal(money.rawLength, 6)
+  assert.equal(money.patternLength, 11)
+
+  maskara.undefine('testApplyMoney')
+})
+
+test('supports field helpers for lightweight form state', () => {
+  const field = maskara.field('###[.]###[.]###[-]##', '123')
+  assert.equal(field.value, '123')
+  assert.equal(field.placeholder, '000.000.000-00')
+  assert.equal(field.complete, false)
+  assert.equal(field.inputProps.value, '123')
+
+  const result = field.set('12345678909')
+  assert.equal(result.value, '123.456.789-09')
+  assert.equal(field.raw, '12345678909')
+  assert.equal(field.complete, true)
+
+  const event = { target: { value: '98765432100' } }
+  field.onChange(event)
+  assert.equal(event.target.value, '987.654.321-00')
+  assert.equal(field.value, '987.654.321-00')
+
+  field.reset()
+  assert.equal(field.value, '')
+
+  const masks = maskara.create({
+    money: {
+      pattern: '########[,]##',
+      transform: raw => Number.parseInt(raw || '0', 10) / 100,
+    },
+  })
+  const money = masks.field('money')
+  money.onInput('129990')
+  assert.equal(money.raw, 1299.9)
+})
+
+test('supports check with form-friendly reasons', () => {
+  const cpf = '###[.]###[.]###[-]##'
+  assert.equal(maskara.check(cpf, '').reason, 'empty')
+  assert.equal(maskara.check(cpf, '123').reason, 'incomplete')
+  assert.equal(maskara.check(cpf, '12345678909').valid, true)
+  assert.equal(maskara.check(cpf, 'abc').reason, 'invalid')
+
+  maskara.define('testCheckMonth', {
+    pattern: '{0-1}#',
+    validate: (raw, _masked, complete) => !complete || (Number(raw) >= 1 && Number(raw) <= 12),
+  })
+
+  const invalidMonth = maskara.check('testCheckMonth', '19')
+  assert.equal(invalidMonth.valid, false)
+  assert.equal(invalidMonth.reason, 'invalid')
+  assert.equal(invalidMonth.masked, '1')
+
+  const masks = maskara.create({
+    month: {
+      pattern: '{0-1}#',
+      validate: (raw, _masked, complete) => !complete || (Number(raw) >= 1 && Number(raw) <= 12),
+    },
+  })
+  assert.equal(masks.check('month', '12').reason, 'complete')
+
+  maskara.undefine('testCheckMonth')
 })
 
 test('supports conditional named masks with patterns/select', () => {
@@ -128,7 +223,55 @@ test('keeps isolated registries separate', () => {
 
   assert.equal(br('cpf', '12345678909'), '123.456.789-09')
   assert.equal(br('document', '11222333000181'), '11.222.333/0001-81')
+  assert.equal(br.unmask('cpf', '123.456.789-09'), '12345678909')
   assert.equal(maskara.names().includes('cpf'), false)
+})
+
+test('supports strict mode on isolated instances', () => {
+  const loose = maskara.create()
+  const strict = maskara.create({}, { strict: true })
+
+  assert.equal(loose('###', '1a2'), '12')
+  assert.equal(strict('###', '1a2'), '1')
+  assert.equal(strict.raw('###', '1a2'), '1')
+  assert.equal(strict.check('###', '1a2').reason, 'invalid')
+
+  const strictMonth = maskara.create({
+    month: {
+      pattern: '{0-1}#',
+      validate: (raw, _masked, complete) => !complete || (Number(raw) >= 1 && Number(raw) <= 12),
+    },
+  }, { strict: true })
+
+  assert.equal(strictMonth('month', '19'), '1')
+  assert.equal(strictMonth.check('month', '19').reason, 'invalid')
+})
+
+test('provides optional payment and date presets', () => {
+  assert.equal(cjsPayment.default, cjsPayment.payment)
+  assert.equal(cjsDatePreset.default, cjsDatePreset.date)
+
+  const pay = maskara.create(payment)
+  assert.equal(pay('card', '4111111111111111'), '4111 1111 1111 1111')
+  assert.equal(pay('card', '371449635398431'), '3714 496353 98431')
+  assert.equal(pay('amex', '371449635398431'), '3714 496353 98431')
+  assert.equal(pay('expiry', '1299'), '12/99')
+  assert.equal(pay('expiry', '1999'), '1')
+  assert.deepEqual(pay.raw('expiry', '12/99'), {
+    raw: '1299',
+    masked: '12/99',
+    month: '12',
+    year: '99',
+    complete: true,
+  })
+  assert.equal(pay('cvv', '1234'), '1234')
+
+  const dates = maskara.create(datePreset)
+  assert.equal(dates('date', '31122026'), '31/12/2026')
+  assert.equal(dates('date', '39992026'), '3')
+  assert.equal(dates.raw('date', '31/12/2026')?.getFullYear(), 2026)
+  assert.equal(dates('time', '2359'), '23:59')
+  assert.equal(dates('time', '2999'), '2')
 })
 
 test('binds to DOM-like inputs with maskara.on', () => {

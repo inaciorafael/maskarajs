@@ -48,6 +48,13 @@ type DocumentationTopic = {
   code: string;
 };
 
+type DocumentationGroup = {
+  id: string;
+  title: string;
+  description: string;
+  topicIds: string[];
+};
+
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
@@ -1182,8 +1189,229 @@ maskara('date', '01122025')
 // '01/12/2025'`,
     },
     {
-      id: "define",
-      menu: "define()",
+      id: "apply",
+      menu: "apply()",
+      eyebrow: "apply()",
+      title: pt
+        ? "Use apply quando a tela precisa de valor, raw e estado juntos."
+        : "Use apply when the UI needs value, raw and state together.",
+      description: pt
+        ? "Ele junta as respostas que normalmente voce buscaria separadas: mascara aplicada, raw, complete, placeholder e metadados do pattern."
+        : "It bundles the answers you would usually request separately: applied mask, raw value, complete state, placeholder and pattern metadata.",
+      bullets: pt
+        ? [
+            "value e masked trazem o mesmo valor pronto para o input.",
+            "placeholder usa a mesma saida de hint para guiar o usuario.",
+            "Em instancias tipadas, raw respeita o transform da mascara nomeada.",
+          ]
+        : [
+            "value and masked return the same input-ready value.",
+            "placeholder uses the same hint output to guide the user.",
+            "In typed instances, raw respects the named mask transform.",
+          ],
+      code: `const cpfPattern = '###[.]###[.]###[-]##'
+const field = maskara.apply(cpfPattern, '12345678909')
+
+input.value = field.value
+input.placeholder = field.placeholder
+submit.disabled = !field.complete
+
+field.masked        // '123.456.789-09'
+field.raw           // '12345678909'
+field.hint          // '000.000.000-00'
+field.rawLength     // 11
+field.patternLength // 14
+
+const money = maskara.create<{ money: number }>({
+  money: {
+    pattern: '########[,]##',
+    transform: raw => Number.parseInt(raw || '0', 10) / 100,
+  },
+})
+
+const price = money.apply('money', '129990')
+
+price.raw // number`,
+      },
+      {
+        id: "unmask",
+        menu: "unmask()",
+        eyebrow: "raw alias",
+        title: pt
+          ? "Quando a intencao for limpar o valor, use unmask."
+          : "When the intent is cleaning the value, use unmask.",
+        description: pt
+          ? "raw continua sendo a fonte da verdade, mas unmask deixa o codigo mais legivel quando voce vai persistir, comparar ou enviar para uma API."
+          : "raw remains the source of truth, but unmask makes code easier to read when persisting, comparing or sending values to an API.",
+        bullets: pt
+          ? [
+              "Mesmo comportamento de raw().",
+              "Funciona no global e em instancias.",
+              "Respeita transform de mascaras nomeadas.",
+            ]
+          : [
+              "Same behavior as raw().",
+              "Works globally and on isolated instances.",
+              "Respects transforms from named masks.",
+            ],
+        code: `const cpf = '###[.]###[.]###[-]##'
+
+maskara.unmask(cpf, '123.456.789-09')
+// '12345678909'
+
+const br = maskara.create({
+  money: {
+    pattern: '########[,]##',
+    transform: raw => Number.parseInt(raw || '0', 10) / 100,
+  },
+})
+
+br.unmask('money', '1299,90')
+// 1299.9`,
+      },
+      {
+        id: "field",
+        menu: "field()",
+        eyebrow: "forms",
+        title: pt
+          ? "Um estado pequeno para campos mascarados."
+          : "A tiny state helper for masked fields.",
+        description: pt
+          ? "field entrega value, raw, complete, placeholder e handlers simples sem te prender a framework ou biblioteca de forms."
+          : "field gives you value, raw, complete, placeholder and simple handlers without locking you into a framework or form library.",
+        bullets: pt
+          ? [
+              "set(), reset(), onChange() e onInput() atualizam o estado.",
+              "Eventos de input recebem o valor mascarado de volta em target.value.",
+              "Bom para demos, web components e formularios pequenos.",
+            ]
+          : [
+              "set(), reset(), onChange() and onInput() update state.",
+              "Input events receive the masked value back in target.value.",
+              "Great for demos, web components and small forms.",
+            ],
+        code: `const cpf = maskara.field('###[.]###[.]###[-]##')
+
+cpf.set('12345678909')
+
+cpf.value       // '123.456.789-09'
+cpf.raw         // '12345678909'
+cpf.complete    // true
+cpf.placeholder // '000.000.000-00'
+
+input.addEventListener('input', cpf.onInput)`,
+      },
+      {
+        id: "check",
+        menu: "check()",
+        eyebrow: "feedback",
+        title: pt
+          ? "Explique o estado do campo sem criar uma validacao pesada."
+          : "Explain field state without creating heavy validation.",
+        description: pt
+          ? "check retorna tudo de apply e adiciona valid, reason, message, missing e expectedLength para feedback visual e debug."
+          : "check returns everything from apply and adds valid, reason, message, missing and expectedLength for UI feedback and debug.",
+        bullets: pt
+          ? [
+              "reason pode ser empty, incomplete, invalid ou complete.",
+              "invalid aparece quando a mascara rejeitou caracteres ou sequencias.",
+              "Regras de negocio continuam no seu validador preferido.",
+            ]
+          : [
+              "reason can be empty, incomplete, invalid or complete.",
+              "invalid appears when the mask rejects characters or sequences.",
+              "Business rules still belong in your validation layer.",
+            ],
+        code: `const state = maskara.check('###[.]###[.]###[-]##', '123')
+
+state.valid   // false
+state.reason  // 'incomplete'
+state.missing // 11
+
+const month = maskara.create({
+  month: {
+    pattern: '{0-1}#',
+    validate: (raw, _, complete) =>
+      !complete || Number(raw) >= 1 && Number(raw) <= 12,
+  },
+})
+
+month.check('month', '19').reason
+// 'invalid'`,
+      },
+      {
+        id: "strict",
+        menu: "strict",
+        eyebrow: "create options",
+        title: pt
+          ? "Escolha entre tolerante e rigido por instancia."
+          : "Choose tolerant or strict behavior per instance.",
+        description: pt
+          ? "Por padrao a maskarajs pula caracteres invalidos quando possivel. Com strict, a instancia para no primeiro caractere rejeitado."
+          : "By default maskarajs skips invalid characters when possible. With strict, the instance stops at the first rejected character.",
+        bullets: pt
+          ? [
+              "O comportamento antigo continua como padrao.",
+              "strict vive em create(), sem afetar o global.",
+              "Ideal para fluxos onde ordem e rejeicao precisam ser explicitas.",
+            ]
+          : [
+              "The old behavior remains the default.",
+              "strict lives in create(), without affecting the global engine.",
+              "Ideal when order and rejection must be explicit.",
+            ],
+        code: `const loose = maskara.create()
+const strict = maskara.create({}, { strict: true })
+
+loose('###', '1a2')
+// '12'
+
+strict('###', '1a2')
+// '1'
+
+strict.check('###', '1a2').reason
+// 'invalid'`,
+      },
+      {
+        id: "presets",
+        menu: "presets",
+        eyebrow: "optional imports",
+        title: pt
+          ? "Presets oficiais sem poluir o global."
+          : "Official presets without polluting the global engine.",
+        description: pt
+          ? "Importe apenas o pacote que precisa e crie uma instancia isolada: br, payment ou date."
+          : "Import only the package you need and create an isolated instance: br, payment or date.",
+        bullets: pt
+          ? [
+              "br cobre CPF, CNPJ, CEP, telefone, data, mes e dinheiro.",
+              "payment cobre cartao, Amex, validade e CVV.",
+              "date cobre data, dia/mes, mes, ano e horario.",
+            ]
+          : [
+              "br covers CPF, CNPJ, CEP, phone, date, month and money.",
+              "payment covers card, Amex, expiry and CVV.",
+              "date covers date, day/month, month, year and time.",
+            ],
+        code: `import maskara from 'maskarajs'
+import { payment } from 'maskarajs/presets/payment'
+import { date } from 'maskarajs/presets/date'
+
+const pay = maskara.create(payment)
+const dates = maskara.create(date)
+
+pay('card', '4111111111111111')
+// '4111 1111 1111 1111'
+
+pay('card', '371449635398431')
+// '3714 496353 98431'
+
+dates('time', '2359')
+// '23:59'`,
+      },
+      {
+        id: "define",
+        menu: "define()",
       eyebrow: "validate()",
       title: pt
         ? "Mantenha regras contextuais junto da mascara."
@@ -1548,6 +1776,44 @@ function CodeBlock({
   return (
     <pre className={cn(codePanelClass, className)}>{highlightCode(code)}</pre>
   );
+}
+
+function buildDocumentationGroups(locale: Locale): DocumentationGroup[] {
+  const pt = locale === "pt-BR";
+  return [
+    {
+      id: "start",
+      title: pt ? "Primeiros passos" : "First steps",
+      description: pt
+        ? "O caminho curto para aplicar, limpar e entender patterns."
+        : "The short path to apply, clean and understand patterns.",
+      topicIds: ["quick-start", "patterns", "registered"],
+    },
+    {
+      id: "forms",
+      title: pt ? "Forms e estado" : "Forms and state",
+      description: pt
+        ? "APIs para inputs, feedback visual e leitura do estado do campo."
+        : "APIs for inputs, visual feedback and reading field state.",
+      topicIds: ["apply", "field", "check", "unmask", "utilities"],
+    },
+    {
+      id: "rules",
+      title: pt ? "Regras avancadas" : "Advanced rules",
+      description: pt
+        ? "Transforme raw, escolha patterns e controle rejeicoes."
+        : "Transform raw, choose patterns and control rejections.",
+      topicIds: ["define", "conditional", "transform", "strict", "slots"],
+    },
+    {
+      id: "ecosystem",
+      title: pt ? "Frameworks e presets" : "Frameworks and presets",
+      description: pt
+        ? "Integre com React, Vue, DOM puro e presets oficiais."
+        : "Integrate with React, Vue, raw DOM and official presets.",
+      topicIds: ["instances", "presets", "react", "vue", "dom"],
+    },
+  ];
 }
 
 function patternBlockClass(kind: BlockKind) {
@@ -2761,77 +3027,186 @@ function BenchmarkSection({ locale }: { locale: Locale }) {
 function ApiDocsSection({ locale }: { locale: Locale }) {
   const t = content[locale].api;
   const topics = useMemo(() => buildDocumentation(locale), [locale]);
+  const groups = useMemo(() => buildDocumentationGroups(locale), [locale]);
   const [activeId, setActiveId] = useState(topics[0].id);
   const activeTopic =
     topics.find((topic) => topic.id === activeId) ?? topics[0];
+  const topicsById = useMemo(
+    () => new Map(topics.map((topic) => [topic.id, topic])),
+    [topics],
+  );
+  const activeGroup =
+    groups.find((group) => group.topicIds.includes(activeTopic.id)) ??
+    groups[0];
+  const activeGroupTopics = activeGroup.topicIds
+    .map((topicId) => topicsById.get(topicId))
+    .filter(Boolean) as DocumentationTopic[];
+  const featuredTopics = activeGroupTopics.slice(0, 3);
+  const helperLabel =
+    locale === "pt-BR" ? "Guia da API" : "API guide";
+  const topicCountLabel =
+    locale === "pt-BR"
+      ? `${topics.length} topicos`
+      : `${topics.length} topics`;
   return (
     <section className={section} id="docs">
       <div className={softBand}>
-        <SectionHeading eyebrow={t.eyebrow} title={t.title} text={t.text} />
-        <div className="mb-4 grid gap-3 md:grid-cols-3">
-          {t.flow.map(([title, text]) => (
-            <div className={cardClass} key={title}>
-              <strong className="block text-ink">{title}</strong>
-              <span className="mt-1 block text-sm leading-[1.45] text-muted">
-                {text}
-              </span>
+        <div className="grid gap-5">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(280px,0.45fr)] lg:items-end">
+            <SectionHeading eyebrow={t.eyebrow} title={t.title} text={t.text} />
+            <div className="grid gap-2 rounded-xl border border-line bg-surface/80 p-4 shadow-maskara-soft">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-language-slot px-2.5 py-1 font-mono text-xs font-black uppercase text-[var(--language-slot-ink)]">
+                  {helperLabel}
+                </span>
+                <span className="rounded-full border border-line px-2.5 py-1 text-xs font-black text-muted">
+                  {topicCountLabel}
+                </span>
+              </div>
+              <div className="grid gap-1.5 text-sm leading-[1.45] text-muted">
+                {t.flow.map(([title, text]) => (
+                  <p className="m-0" key={title}>
+                    <strong className="text-ink">{title}:</strong> {text}
+                  </p>
+                ))}
+              </div>
             </div>
-          ))}
-        </div>
-        <div
-          className={cn(
-            borderedPanel,
-            "grid overflow-hidden lg:grid-cols-[260px_minmax(0,1fr)]",
-          )}
-        >
+          </div>
+
           <nav
-            className="grid content-start gap-2 border-b border-line p-3 lg:border-r lg:border-b-0"
+            className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
             aria-label={
-              locale === "pt-BR" ? "Menu da documentacao" : "Documentation menu"
+              locale === "pt-BR"
+                ? "Grupos da documentacao"
+                : "Documentation groups"
             }
           >
-            {topics.map((topic) => (
-              <button
-                className={cn(
-                  "rounded-lg border border-line bg-surface p-3 text-left",
-                  activeTopic.id === topic.id &&
-                  "border-teal bg-[color-mix(in_srgb,var(--teal)_12%,var(--surface))]",
-                )}
-                key={topic.id}
-                type="button"
-                aria-pressed={activeTopic.id === topic.id}
-                onClick={() => setActiveId(topic.id)}
-              >
-                <span className="block font-mono text-[11px] font-black uppercase text-teal">
-                  {topic.eyebrow}
-                </span>
-                <strong className="mt-1 block text-sm text-ink">
-                  {topic.menu}
-                </strong>
-              </button>
-            ))}
+            {groups.map((group, index) => {
+              const selected = group.id === activeGroup.id;
+              const firstTopic = group.topicIds[0];
+              return (
+                <button
+                  className={cn(
+                    "min-h-[148px] rounded-xl border border-line bg-surface p-4 text-left shadow-maskara-soft transition duration-200 hover:-translate-y-0.5 hover:border-teal",
+                    selected &&
+                      "border-teal bg-[color-mix(in_srgb,var(--teal)_10%,var(--surface))]",
+                  )}
+                  key={group.id}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => setActiveId(firstTopic)}
+                >
+                  <span className="font-mono text-xs font-black text-teal">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <strong className="mt-2 block text-lg leading-tight text-ink">
+                    {group.title}
+                  </strong>
+                  <span className="mt-2 block text-sm leading-[1.45] text-muted">
+                    {group.description}
+                  </span>
+                  <span className="mt-3 block text-xs font-black uppercase text-muted">
+                    {group.topicIds.length}{" "}
+                    {locale === "pt-BR" ? "itens" : "items"}
+                  </span>
+                </button>
+              );
+            })}
           </nav>
-          <article className="grid gap-4 p-4 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1fr)]">
-            <div className="grid content-start gap-3">
-              <span className="w-fit rounded-full bg-language-slot px-2.5 py-1 font-mono text-xs font-black text-[var(--language-slot-ink)]">
-                {activeTopic.eyebrow}
-              </span>
-              <h3 className="m-0 text-[clamp(26px,3vw,40px)] leading-none text-ink">
-                {activeTopic.title}
-              </h3>
-              <p className="m-0 leading-[1.55] text-muted">
-                {activeTopic.description}
-              </p>
-              <ul className="m-0 grid gap-2 pl-5 text-muted">
-                {activeTopic.bullets.map((bullet) => (
-                  <li className="pl-1" key={bullet}>
-                    {bullet}
-                  </li>
+
+          <div
+            className={cn(
+              borderedPanel,
+              "grid overflow-hidden bg-[linear-gradient(180deg,var(--surface),color-mix(in_srgb,var(--surface-soft)_72%,var(--surface)))] lg:grid-cols-[300px_minmax(0,1fr)]",
+            )}
+          >
+            <aside className="grid content-start gap-4 border-b border-line p-4 lg:border-r lg:border-b-0">
+              <div>
+                <span className="font-mono text-xs font-black uppercase text-teal">
+                  {activeGroup.title}
+                </span>
+                <h3 className="m-0 mt-1 text-2xl leading-none text-ink">
+                  {locale === "pt-BR" ? "Escolha o topico" : "Choose a topic"}
+                </h3>
+              </div>
+
+              <div className="flex gap-2 overflow-x-auto pb-1 lg:grid lg:overflow-visible lg:pb-0">
+                {activeGroupTopics.map((topic) => (
+                  <button
+                    className={cn(
+                      "min-w-[190px] rounded-lg border border-line bg-surface px-3 py-3 text-left transition hover:border-teal lg:min-w-0",
+                      activeTopic.id === topic.id &&
+                        "border-teal bg-[color-mix(in_srgb,var(--teal)_12%,var(--surface))]",
+                    )}
+                    key={topic.id}
+                    type="button"
+                    aria-pressed={activeTopic.id === topic.id}
+                    onClick={() => setActiveId(topic.id)}
+                  >
+                    <span className="block font-mono text-[11px] font-black uppercase text-teal">
+                      {topic.eyebrow}
+                    </span>
+                    <strong className="mt-1 block text-sm leading-tight text-ink">
+                      {topic.menu}
+                    </strong>
+                  </button>
                 ))}
-              </ul>
-            </div>
-            <CodeBlock code={activeTopic.code} />
-          </article>
+              </div>
+
+              <div className="hidden gap-2 lg:grid">
+                <span className="text-xs font-black uppercase text-muted">
+                  {locale === "pt-BR" ? "Destaques" : "Highlights"}
+                </span>
+                {featuredTopics.map((topic) => (
+                  <p className="m-0 text-sm leading-[1.45] text-muted" key={topic.id}>
+                    <strong className="text-ink">{topic.menu}:</strong>{" "}
+                    {topic.description}
+                  </p>
+                ))}
+              </div>
+            </aside>
+
+            <article className="grid min-w-0 gap-5 p-4 sm:p-5">
+              <div className="grid gap-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-language-slot px-2.5 py-1 font-mono text-xs font-black text-[var(--language-slot-ink)]">
+                    {activeTopic.eyebrow}
+                  </span>
+                  <span className="rounded-full border border-line px-2.5 py-1 text-xs font-black text-muted">
+                    {activeGroup.title}
+                  </span>
+                </div>
+                <h3 className="m-0 max-w-[760px] text-[clamp(28px,3.6vw,48px)] leading-none text-ink">
+                  {activeTopic.title}
+                </h3>
+                <p className="m-0 max-w-[780px] text-[17px] leading-[1.6] text-muted">
+                  {activeTopic.description}
+                </p>
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,0.62fr)_minmax(0,1fr)]">
+                <div className="grid content-start gap-3">
+                  {activeTopic.bullets.map((bullet, index) => (
+                    <div
+                      className="grid grid-cols-[34px_minmax(0,1fr)] gap-3 rounded-xl border border-line bg-surface p-3"
+                      key={bullet}
+                    >
+                      <span className="grid h-8 w-8 place-items-center rounded-full bg-language-expr font-mono text-xs font-black text-[var(--language-expr-ink)]">
+                        {index + 1}
+                      </span>
+                      <p className="m-0 self-center text-sm leading-[1.45] text-muted">
+                        {bullet}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                <CodeBlock
+                  className="max-h-[520px] text-[12.5px] sm:text-[13px]"
+                  code={activeTopic.code}
+                />
+              </div>
+            </article>
+          </div>
         </div>
       </div>
     </section>

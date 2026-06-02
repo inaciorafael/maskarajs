@@ -28,6 +28,16 @@
       "import": "./src/presets/br.mjs",
       "require": "./src/presets/br.cjs.js",
       "types": "./src/presets/br.d.ts"
+    },
+    "./presets/payment": {
+      "import": "./src/presets/payment.mjs",
+      "require": "./src/presets/payment.cjs.js",
+      "types": "./src/presets/payment.d.ts"
+    },
+    "./presets/date": {
+      "import": "./src/presets/date.mjs",
+      "require": "./src/presets/date.cjs.js",
+      "types": "./src/presets/date.d.ts"
     }
   },
   "files": [

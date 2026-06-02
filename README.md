@@ -37,7 +37,11 @@ import maskara from 'maskarajs'
 
 ```js
 maskara(pattern, value)                // apply mask -> formatted string
+maskara.apply(pattern, value)          // rich result with masked/raw/complete/hint
 maskara.raw(pattern, value)            // clean value / transform result
+maskara.unmask(pattern, value)         // semantic alias for raw()
+maskara.field(pattern, value)          // lightweight form state helper
+maskara.check(pattern, value)          // explain complete/empty/invalid/incomplete
 maskara.is(pattern, value)             // complete pattern? -> boolean
 maskara.hint(pattern)                  // readable placeholder -> string
 maskara.format(pattern, value)         // semantic alias for maskara()
@@ -50,7 +54,7 @@ maskara.defineSlot(symbol, definition) // create or override an input token
 maskara.undefineSlot(symbol)           // remove a custom token
 maskara.slots()                        // list available input tokens
 maskara.on(input, pattern, options)    // bind to a DOM input -> cleanup()
-maskara.create(presets)                // isolated instance with its own registry
+maskara.create(presets, options)       // isolated instance with its own registry
 ```
 
 ## React adapter
@@ -93,6 +97,137 @@ const cpf = useMaskara('cpf', { engine: appMaskara })
 ```
 
 The hook stores field state. The engine stores mask configuration.
+
+## `apply`: rich result for forms
+
+Use `apply()` when a form, adapter or debug panel needs more than the masked string. It is a convenience API over `maskara()`, `raw()`, `is()`, `hint()`, `rawLength()` and `patternLength()`.
+
+```js
+const result = maskara.apply('###[.]###[.]###[-]##', '12345678909')
+
+result.masked        // '123.456.789-09'
+result.value         // '123.456.789-09'
+result.raw           // '12345678909'
+result.complete      // true
+result.hint          // '000.000.000-00'
+result.placeholder   // '000.000.000-00'
+result.rawLength     // 11
+result.patternLength // 14
+```
+
+It also respects named masks, `validate`, `transform`, custom slots and isolated instances:
+
+```js
+maskara.define('money', {
+  pattern: '########[,]##',
+  transform: raw => Number.parseInt(raw || '0', 10) / 100,
+})
+
+maskara.apply('money', '129990').raw
+// 1299.9
+```
+
+With typed instances, `apply().raw` follows the registry type:
+
+```ts
+const masks = maskara.create<{ money: number }>({
+  money: {
+    pattern: '########[,]##',
+    transform: raw => Number.parseInt(raw || '0', 10) / 100,
+  },
+})
+
+const result = masks.apply('money', '129990')
+
+result.raw
+// number
+```
+
+In UI code, `apply()` keeps input state and metadata close together:
+
+```ts
+const cpfPattern = '###[.]###[.]###[-]##'
+const field = maskara.apply(cpfPattern, value)
+
+input.value = field.value
+input.placeholder = field.placeholder
+submit.disabled = !field.complete
+```
+
+## `unmask`: semantic alias for `raw`
+
+`raw()` remains the source of truth, but `unmask()` reads nicely when the code is preparing a value for persistence, API calls or comparison.
+
+```ts
+const cpf = '###[.]###[.]###[-]##'
+
+maskara.raw(cpf, '123.456.789-09')
+// '12345678909'
+
+maskara.unmask(cpf, '123.456.789-09')
+// '12345678909'
+```
+
+It also works on isolated instances and respects `transform` exactly like `raw()`.
+
+## `field`: lightweight form state
+
+Use `field()` when you want a tiny framework-agnostic state helper without reaching for a React hook, Vue directive or form library.
+
+```ts
+const cpf = maskara.field('###[.]###[.]###[-]##')
+
+cpf.set('12345678909')
+
+cpf.value       // '123.456.789-09'
+cpf.raw         // '12345678909'
+cpf.complete    // true
+cpf.placeholder // '000.000.000-00'
+
+input.addEventListener('input', cpf.onInput)
+```
+
+`field()` also accepts input-like events and writes the masked value back to `event.target.value`, which makes it useful for simple DOM integrations.
+
+## `check`: readable state for forms and debug
+
+`check()` returns everything from `apply()` plus a small explanation layer.
+
+```ts
+const state = maskara.check('###[.]###[.]###[-]##', '123')
+
+state.valid    // false
+state.reason   // 'incomplete'
+state.message  // 'Value does not complete the mask yet.'
+state.missing  // chars missing in the formatted value
+```
+
+Reasons are intentionally small and stable:
+
+- `empty`: no value yet
+- `incomplete`: value is accepted, but not complete
+- `invalid`: the mask rejected characters or a sequence
+- `complete`: value fills the mask
+
+This is designed for field feedback. Domain validation such as CPF checksum, credit card verification or business rules should still live in your validation layer.
+
+## Strict instances
+
+By default, maskarajs is tolerant: invalid pasted characters are skipped when possible. For flows that need to stop at the first invalid character, create an isolated strict engine.
+
+```ts
+const loose = maskara.create()
+const strict = maskara.create({}, { strict: true })
+
+loose('###', '1a2')
+// '12'
+
+strict('###', '1a2')
+// '1'
+
+strict.check('###', '1a2').reason
+// 'invalid'
+```
 
 ## Vue 3 adapter
 
@@ -435,6 +570,35 @@ The preset includes:
 | `date` | `DD/MM/YYYY`, rejects invalid months and returns `Date \| null` |
 | `month` | accepts only `01` to `12` |
 | `money` | decimal money value from cents |
+
+## Other official presets
+
+Presets are optional imports. They are plain mask definition objects, so they only affect the isolated engine where you pass them.
+
+```ts
+import maskara from 'maskarajs'
+import { payment, type PaymentPresetRegistry } from 'maskarajs/presets/payment'
+import { date, type DatePresetRegistry } from 'maskarajs/presets/date'
+
+const pay = maskara.create<PaymentPresetRegistry>(payment)
+const dates = maskara.create<DatePresetRegistry>(date)
+
+pay('card', '4111111111111111')       // -> '4111 1111 1111 1111'
+pay('card', '371449635398431')        // -> '3714 496353 98431'
+pay.raw('expiry', '12/29').complete   // -> true
+
+dates('date', '31122026')             // -> '31/12/2026'
+dates.raw('date', '31/12/2026')       // -> Date | null
+dates('time', '2359')                 // -> '23:59'
+```
+
+Available focused presets:
+
+| Import | Includes |
+|---|---|
+| `maskarajs/presets/br` | `cpf`, `cnpj`, `cep`, `phone`, `date`, `month`, `money` |
+| `maskarajs/presets/payment` | `card`, `card16`, `amex`, `expiry`, `cvv` |
+| `maskarajs/presets/date` | `date`, `dayMonth`, `month`, `year`, `time` |
 
 ## `rawLength` and `patternLength`
 
