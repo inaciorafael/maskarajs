@@ -1974,8 +1974,28 @@ const chalkExamples: ChalkExample[] = [
   },
   {
     label: "CEP",
-    pattern: "#####-###",
-    raw: "98423742432",
+    pattern: "#####[-]###",
+    raw: "01310930",
+  },
+  {
+    label: "Telefone",
+    pattern: "[(]##[)] #####[-]####",
+    raw: "11987654321",
+  },
+  {
+    label: "CNPJ",
+    pattern: "##[.]###[.]###[/]####[-]##",
+    raw: "12345678000199",
+  },
+  {
+    label: "Cartão",
+    pattern: "{4}### #### #### ####",
+    raw: "4111111111111111",
+  },
+  {
+    label: "Sufixo automático",
+    pattern: "###[BR]",
+    raw: "123",
   },
 ];
 
@@ -2075,7 +2095,7 @@ function AnimatedChalkboard({ locale }: { locale: Locale }) {
       };
 
   return (
-    <div className="relative grid min-h-[230px] content-center gap-4 overflow-hidden rounded-[10px_8px_12px_8px] border-[8px] border-[#6f4a2d] bg-[#12372f] p-[22px_22px_26px] text-[#ecfff7] shadow-[0_22px_44px_rgb(0_0_0_/_24%),inset_0_0_0_2px_rgb(255_255_255_/_8%),inset_0_-18px_36px_rgb(0_0_0_/_14%)] rotate-[-1.2deg]">
+    <div className="relative grid min-h-[230px] content-center gap-4 overflow-visible rounded-[10px_8px_12px_8px] border-[8px] border-[#6f4a2d] bg-[#12372f] p-[22px_22px_26px] text-[#ecfff7] shadow-[0_22px_44px_rgb(0_0_0_/_24%),inset_0_0_0_2px_rgb(255_255_255_/_8%),inset_0_-18px_36px_rgb(0_0_0_/_14%)] rotate-[-1.2deg]">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgb(255_255_255_/_9%),transparent_22%),linear-gradient(110deg,transparent,rgb(255_255_255_/_4%),transparent)] opacity-70" />
       <div
         className="relative z-[1] grid gap-4 animate-[chalk-example-swap_5.4s_ease-in-out_infinite]"
@@ -2094,7 +2114,7 @@ function AnimatedChalkboard({ locale }: { locale: Locale }) {
           <span className="font-mono text-[11px] font-black uppercase text-[#ecfff7]/66">
             {copy.pattern}
           </span>
-          <div className="flex flex-wrap items-center gap-1.5 font-mono">
+          <div className="flex w-max flex-nowrap items-center gap-1.5 whitespace-nowrap font-mono">
             {patternTokens.map((token, index) => (
               <span
                 className={cn(
@@ -2115,7 +2135,7 @@ function AnimatedChalkboard({ locale }: { locale: Locale }) {
           <span className="font-mono text-[11px] font-black uppercase text-[#ecfff7]/66">
             {copy.value}
           </span>
-          <div className="flex flex-wrap items-center gap-1.5 font-mono">
+          <div className="flex w-max flex-nowrap items-center gap-1.5 whitespace-nowrap font-mono">
             {valueTokens.map((token, index) => (
               <span
                 className={cn(
@@ -2131,7 +2151,7 @@ function AnimatedChalkboard({ locale }: { locale: Locale }) {
           </div>
         </div>
 
-        <small className="font-mono text-xs text-[#ecfff7]/75">
+        <small className="block w-max whitespace-nowrap font-mono text-xs text-[#ecfff7]/75">
           {example.pattern} → {masked}
         </small>
       </div>
@@ -3263,6 +3283,83 @@ function ReactFormsSection({ locale }: { locale: Locale }) {
   );
 }
 
+function AnimatedExamplesSection({ locale }: { locale: Locale }) {
+  const pt = locale === "pt-BR";
+  const sample = "###[BR]";
+  const masked = maskara(sample, "123");
+  const raw = maskara.raw(sample, masked);
+  const notes = pt
+    ? [
+        ["Pattern", "Slots, literais e expressoes aparecem separados por cor."],
+        ["Digitacao", "O raw entra limpo e a mascara decide o que aparece."],
+        ["Resultado", "Quando a mascara completa, o valor final fica previsivel."],
+      ]
+    : [
+        ["Pattern", "Slots, literals and expressions appear separated by color."],
+        ["Typing", "Raw input comes in clean and the mask decides what appears."],
+        ["Result", "When the mask completes, the final value becomes predictable."],
+      ];
+
+  return (
+    <section className={section} id="maskara-em-acao">
+      <div className="grid gap-5 rounded-2xl border border-line bg-[linear-gradient(135deg,color-mix(in_srgb,var(--teal)_10%,var(--surface)),var(--surface)_54%,color-mix(in_srgb,var(--amber)_14%,var(--surface)))] p-4 shadow-maskara-soft lg:p-5">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,0.78fr)_minmax(300px,0.42fr)] lg:items-end">
+          <SectionHeading
+            compact
+            eyebrow={pt ? "Mascara em acao" : "Mask in action"}
+            title={
+              pt
+                ? "Veja o pattern virar valor de input."
+                : "Watch the pattern become an input value."
+            }
+            text={
+              pt
+                ? "A lousa mostra a parte mais importante da maskarajs: o dev escreve uma linguagem curta, o usuario digita raw e a interface recebe um valor pronto."
+                : "The board shows the important part of maskarajs: developers write a compact language, users type raw input, and the interface receives a ready value."
+            }
+          />
+          <div className="hidden rounded-xl border border-line bg-surface/82 p-4 shadow-maskara-soft md:grid">
+            <span className="font-mono text-xs font-black uppercase text-teal">
+              {pt ? "Exemplo final" : "Final example"}
+            </span>
+            <code className="mt-3 block overflow-auto rounded-lg bg-[#101917] p-3 text-sm text-[#d6fff1]">
+              {sample} → {masked}
+            </code>
+            <p className="m-0 mt-3 text-sm leading-[1.45] text-muted">
+              raw: <strong className="text-ink">{String(raw)}</strong>
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="relative min-w-0 overflow-visible rounded-2xl border border-line bg-[color-mix(in_srgb,var(--surface-soft)_76%,var(--surface))] p-4 shadow-[0_20px_48px_var(--shadow-soft)]">
+            <AnimatedChalkboard locale={locale} />
+          </div>
+
+          <div className="grid content-start gap-3">
+            {notes.map(([title, text], index) => (
+              <article
+                className="grid grid-cols-[42px_minmax(0,1fr)] gap-3 rounded-xl border border-line bg-surface p-4 shadow-maskara-soft"
+                key={title}
+              >
+                <span className="grid h-10 w-10 place-items-center rounded-full bg-language-expr font-mono text-sm font-black text-[var(--language-expr-ink)]">
+                  {index + 1}
+                </span>
+                <div className="grid gap-1">
+                  <strong className="text-ink">{title}</strong>
+                  <p className="m-0 text-sm leading-[1.45] text-muted">
+                    {text}
+                  </p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function App() {
   const [locale, setLocale] = useState<Locale>(
     () =>
@@ -3366,10 +3463,15 @@ function App() {
           aria-label="Mask example"
         >
           <div
-            className="grid min-h-[250px] grid-cols-1 items-end gap-3 md:grid-cols-[1fr_240px]"
+            className="grid min-h-[250px] grid-cols-1 items-center gap-3 md:grid-cols-[1fr_240px]"
             aria-hidden="true"
           >
-            <AnimatedChalkboard locale={locale} />
+            <div className="grid gap-3 rounded-xl border border-line bg-surface/86 p-4 shadow-maskara-soft">
+              <span className="w-fit rounded-full bg-language-slot px-2.5 py-1 font-mono text-xs font-black text-[var(--language-slot-ink)]">
+                {locale === "pt-BR" ? "Preview rapido" : "Quick preview"}
+              </span>
+              <PatternVisualizer patternText="##[/]{0-1}#[/]####" locale={locale} />
+            </div>
             <div className="relative grid aspect-square w-[min(235px,100%)] place-items-center justify-self-center rounded-[28px_18px_26px_18px] border border-white/15 bg-[radial-gradient(circle_at_50%_48%,rgb(244_185_66_/_30%),transparent_54%),linear-gradient(145deg,rgb(255_255_255_/_10%),rgb(255_255_255_/_2%))] shadow-[0_24px_60px_rgb(0_0_0_/_24%),inset_0_0_0_1px_rgb(255_255_255_/_8%)] animate-[mascot-float_6s_ease-in-out_infinite]">
               <span className="absolute left-[-12px] top-[12%] z-[2] grid min-h-[34px] min-w-[38px] place-items-center rounded-full border border-white/20 bg-amber px-2.5 font-mono text-[13px] font-black text-[#101917] shadow-[0_12px_24px_rgb(0_0_0_/_18%)] animate-[rune-drift_5.5s_ease-in-out_infinite]">
                 #
@@ -3387,12 +3489,12 @@ function App() {
               />
             </div>
           </div>
-          <PatternVisualizer patternText="##[/]{0-1}#[/]####" locale={locale} />
           <CodeBlock
             code={`maskara.define('month', {\n  pattern: '{0-1}#',\n  validate: raw => Number(raw) <= 12\n})\n\nmaskara('month', '19') // '1'`}
           />
         </div>
       </section>
+      <AnimatedExamplesSection locale={locale} />
       <SyntaxIntro locale={locale} />
       <Playground locale={locale} presets={presets} />
       <CustomLab locale={locale} />

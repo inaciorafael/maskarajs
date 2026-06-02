@@ -181,19 +181,23 @@ function inputCount(pattern, slots = globalSlots, cacheId = 'global', slotsVersi
 
 /**
  * Aplica tokens a chars de input já filtrados e validados.
- * Retorna o valor mascarado, sem literais pendurados no final.
+ * Retorna o valor mascarado, sem literais pendurados enquanto a máscara está parcial.
+ * Quando todos os slots foram preenchidos, literais finais entram no valor final.
  */
 function applyTokens(tokens, inputChars) {
   let masked = ''
   let ci = 0
+  const totalInputs = tokens.filter(token => token.type === 'input').length
+  const complete = totalInputs > 0 && inputChars.length >= totalInputs
 
   for (const token of tokens) {
-    if (ci >= inputChars.length) break
-
     if (token.type === 'literal') {
+      if (ci >= inputChars.length && !complete) break
       masked += token.value
       continue
     }
+
+    if (ci >= inputChars.length) break
 
     if (token.test(inputChars[ci])) {
       masked += inputChars[ci]
@@ -202,6 +206,8 @@ function applyTokens(tokens, inputChars) {
       break
     }
   }
+
+  if (complete) return masked
 
   // remove literais pendurados no final sem input depois deles
   let trimmed = masked
@@ -215,6 +221,30 @@ function applyTokens(tokens, inputChars) {
   }
 
   return trimmed
+}
+
+function trailingLiteralValue(tokens) {
+  let value = ''
+
+  for (let i = tokens.length - 1; i >= 0; i--) {
+    const token = tokens[i]
+    if (token.type !== 'literal') break
+    value = token.value + value
+  }
+
+  return value
+}
+
+function hasPartialTrailingLiteral(value, tokens) {
+  const literal = trailingLiteralValue(tokens)
+  if (!literal) return false
+
+  const text = String(value)
+  for (let i = 1; i < literal.length; i++) {
+    if (text.endsWith(literal.slice(0, i))) return true
+  }
+
+  return false
 }
 
 // ─── Seleção de padrão dinâmico ────────────────────────────────────────────
@@ -503,7 +533,14 @@ function extractInputChars(value, patterns, validate = defaultValidate, slots = 
   }
 
   // 5. trunca ao limite do padrão (fonte da verdade do tamanho máximo)
-  return valid.slice(0, inputCount(chosen, slots, cacheId, slotsVersion))
+  const truncated = valid.slice(0, inputCount(chosen, slots, cacheId, slotsVersion))
+  const complete = truncated.length >= inputCount(chosen, slots, cacheId, slotsVersion)
+
+  if (complete && hasPartialTrailingLiteral(value, parse(chosen, slots, cacheId, slotsVersion))) {
+    return truncated.slice(0, -1)
+  }
+
+  return truncated
 }
 
 // ─── Registro de máscaras nomeadas ────────────────────────────────────────

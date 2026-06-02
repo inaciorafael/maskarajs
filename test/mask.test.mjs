@@ -43,6 +43,23 @@ test('applies a single pattern and strips literals in raw', () => {
   assert.equal(maskara.patternLength(cpf), 14)
 })
 
+test('keeps trailing literals only when all slots are filled', () => {
+  const suffix = '###[BR]'
+  assert.equal(maskara(suffix, ''), '')
+  assert.equal(maskara(suffix, '12'), '12')
+  assert.equal(maskara(suffix, '123'), '123BR')
+  assert.equal(maskara(suffix, '123B'), '12')
+  assert.equal(maskara.raw(suffix, '123BR'), '123')
+  assert.equal(maskara.raw(suffix, '123B'), '12')
+  assert.equal(maskara.is(suffix, '123B'), false)
+  assert.equal(maskara.is(suffix, '123'), true)
+  assert.equal(maskara.patternLength(suffix), 5)
+
+  const middle = '##[-]##'
+  assert.equal(maskara(middle, '12'), '12')
+  assert.equal(maskara(middle, '1234'), '12-34')
+})
+
 test('keeps old dynamic string arrays by input size', () => {
   const phone = ['[(]##[)] ####[-]####', '[(]##[)] #####[-]####']
   assert.equal(maskara(phone, '1134567890'), '(11) 3456-7890')
