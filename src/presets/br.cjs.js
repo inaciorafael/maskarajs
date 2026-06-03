@@ -1,5 +1,3 @@
-'use strict'
-
 function validMonth(raw) {
   if (raw.length < 4) return true
   const month = Number(raw.slice(2, 4))
@@ -19,11 +17,31 @@ function toMoney(raw) {
 const br = Object.freeze({
   cpf: { pattern: '###[.]###[.]###[-]##' },
   cnpj: { pattern: '##[.]###[.]###[/]####[-]##' },
+  document: {
+    pattern: [
+      '###[.]###[.]###[-]##',
+      '##[.]###[.]###[/]####[-]##',
+    ],
+  },
+  cpfCnpj: {
+    pattern: [
+      '###[.]###[.]###[-]##',
+      '##[.]###[.]###[/]####[-]##',
+    ],
+  },
   cep: {
     pattern: '#####[-]###',
     transform: (raw, _masked, complete) => (complete ? raw : null),
   },
   phone: { pattern: ['[(]##[)] ####[-]####', '[(]##[)] #####[-]####'] },
+  mobile: { pattern: '[(]##[)] #####[-]####' },
+  landline: { pattern: '[(]##[)] ####[-]####' },
+  plate: {
+    pattern: [
+      { pattern: '@@@#@##', when: raw => /[A-Za-zÀ-ÿ]/.test(raw[4] || '') },
+      '@@@[-]####',
+    ],
+  },
   date: {
     pattern: '##[/]{0-1}#[/]####',
     validate: validMonth,
@@ -35,6 +53,14 @@ const br = Object.freeze({
   },
   money: {
     pattern: '########[,]##',
+    transform: toMoney,
+  },
+  currency: {
+    pattern: '########[,]##',
+    transform: toMoney,
+  },
+  percent: {
+    pattern: '###[,]##',
     transform: toMoney,
   },
 })

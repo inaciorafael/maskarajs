@@ -17,11 +17,31 @@ function toMoney(raw) {
 export const br = Object.freeze({
   cpf: { pattern: '###[.]###[.]###[-]##' },
   cnpj: { pattern: '##[.]###[.]###[/]####[-]##' },
+  document: {
+    pattern: [
+      '###[.]###[.]###[-]##',
+      '##[.]###[.]###[/]####[-]##',
+    ],
+  },
+  cpfCnpj: {
+    pattern: [
+      '###[.]###[.]###[-]##',
+      '##[.]###[.]###[/]####[-]##',
+    ],
+  },
   cep: {
     pattern: '#####[-]###',
     transform: (raw, _masked, complete) => (complete ? raw : null),
   },
   phone: { pattern: ['[(]##[)] ####[-]####', '[(]##[)] #####[-]####'] },
+  mobile: { pattern: '[(]##[)] #####[-]####' },
+  landline: { pattern: '[(]##[)] ####[-]####' },
+  plate: {
+    pattern: [
+      { pattern: '@@@#@##', when: raw => /[A-Za-zÀ-ÿ]/.test(raw[4] || '') },
+      '@@@[-]####',
+    ],
+  },
   date: {
     pattern: '##[/]{0-1}#[/]####',
     validate: validMonth,
@@ -33,6 +53,14 @@ export const br = Object.freeze({
   },
   money: {
     pattern: '########[,]##',
+    transform: toMoney,
+  },
+  currency: {
+    pattern: '########[,]##',
+    transform: toMoney,
+  },
+  percent: {
+    pattern: '###[,]##',
     transform: toMoney,
   },
 })

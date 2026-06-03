@@ -1,15 +1,19 @@
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import maskara, { mask, maskara as namedMaskara } from '../src/core/mask.mjs'
+import maskaraMin from '../src/core/mask.min.mjs'
 import maskaraDirective, { createMaskaraDirective, createMaskaraPlugin, vMaskara } from '../src/adapters/vue/index.mjs'
 import payment from '../src/presets/payment.mjs'
 import datePreset from '../src/presets/date.mjs'
+import br from '../src/presets/br.mjs'
 
 const require = createRequire(import.meta.url)
 const cjsMaskara = require('../src/core/mask.cjs.js')
+const cjsMaskaraMin = require('../src/core/mask.min.cjs.js')
 const cjsVue = require('../src/adapters/vue/index.cjs.js')
 const cjsPayment = require('../src/presets/payment.cjs.js')
 const cjsDatePreset = require('../src/presets/date.cjs.js')
+const cjsBR = require('../src/presets/br.cjs.js')
 
 const test = (name, fn) => {
   try {
@@ -27,6 +31,8 @@ test('exports default and named aliases', () => {
   assert.equal(cjsMaskara, cjsMaskara.mask)
   assert.equal(cjsMaskara, cjsMaskara.maskara)
   assert.equal(cjsMaskara, cjsMaskara.default)
+  assert.equal(maskaraMin('###[.]###', '123456'), '123.456')
+  assert.equal(cjsMaskaraMin('###[.]###', '123456'), '123.456')
   assert.equal(maskaraDirective, vMaskara)
   assert.equal(cjsVue, cjsVue.maskaraDirective)
   assert.equal(cjsVue, cjsVue.default)
@@ -121,6 +127,67 @@ test('supports apply with rich metadata', () => {
   assert.equal(money.patternLength, 11)
 
   maskara.undefine('testApplyMoney')
+})
+
+test('explains patterns for playgrounds and docs', () => {
+  const explanation = maskara.explain('###[.]##{0-9}')
+
+  assert.equal(explanation.hint, '000.000')
+  assert.equal(explanation.rawLength, 6)
+  assert.equal(explanation.patternLength, 7)
+  assert.equal(explanation.variants.length, 1)
+  assert.deepEqual(explanation.variants[0].tokens.map(token => token.type), [
+    'slot',
+    'slot',
+    'slot',
+    'literal',
+    'slot',
+    'slot',
+    'expression',
+  ])
+  assert.deepEqual(explanation.variants[0].tokens[3], {
+    type: 'literal',
+    index: 3,
+    value: '.',
+    length: 1,
+  })
+})
+
+test('provides reusable transform helpers', () => {
+  maskara.define('testTransformCents', {
+    pattern: '########[,]##',
+    transform: maskara.transforms.cents,
+  })
+
+  maskara.define('testTransformDate', {
+    pattern: '##[/]##[/]####',
+    transform: maskara.transforms.dateBR,
+  })
+
+  maskara.define('testTransformParts', {
+    pattern: '##[/]##[/]####',
+    transform: maskara.transforms.parts({
+      day: [0, 2],
+      month: [2, 4],
+      year: [4, 8],
+    }),
+  })
+
+  assert.equal(maskara.raw('testTransformCents', '129990'), 1299.9)
+  assert.equal(maskara.raw('testTransformDate', '31/12/2026')?.getFullYear(), 2026)
+  assert.equal(maskara.raw('testTransformDate', '31/02/2026'), null)
+  assert.deepEqual(maskara.raw('testTransformParts', '31/12/2026'), {
+    raw: '31122026',
+    masked: '31/12/2026',
+    complete: true,
+    day: '31',
+    month: '12',
+    year: '2026',
+  })
+
+  maskara.undefine('testTransformCents')
+  maskara.undefine('testTransformDate')
+  maskara.undefine('testTransformParts')
 })
 
 test('supports field helpers for lightweight form state', () => {
@@ -267,6 +334,7 @@ test('supports strict mode on isolated instances', () => {
 test('provides optional payment and date presets', () => {
   assert.equal(cjsPayment.default, cjsPayment.payment)
   assert.equal(cjsDatePreset.default, cjsDatePreset.date)
+  assert.equal(cjsBR.default, cjsBR.br)
 
   const pay = maskara.create(payment)
   assert.equal(pay('card', '4111111111111111'), '4111 1111 1111 1111')
@@ -291,21 +359,43 @@ test('provides optional payment and date presets', () => {
   assert.equal(dates('time', '2999'), '2')
 })
 
-test('binds to DOM-like inputs with maskara.on', () => {
+test('provides optional Brazilian presets', () => {
+  const masks = maskara.create(br)
+
+  assert.equal(masks('document', '12345678909'), '123.456.789-09')
+  assert.equal(masks('document', '11222333000181'), '11.222.333/0001-81')
+  assert.equal(masks('cpfCnpj', '11222333000181'), '11.222.333/0001-81')
+  assert.equal(masks('mobile', '11987654321'), '(11) 98765-4321')
+  assert.equal(masks('landline', '1134567890'), '(11) 3456-7890')
+  assert.equal(masks('plate', 'ABC1234'), 'ABC-1234')
+  assert.equal(masks('plate', 'ABC1D23'), 'ABC1D23')
+  assert.equal(masks.raw('currency', '1299,90'), 1299.9)
+  assert.equal(masks.raw('percent', '1250'), 12.5)
+})
+
+function createInputMock(initialValue = '') {
   const listeners = new Map()
   const input = {
-    value: '',
-    selectionStart: 0,
+    value: initialValue,
+    selectionStart: initialValue.length,
+    selectionEnd: initialValue.length,
     addEventListener(type, listener) {
       listeners.set(type, listener)
     },
     removeEventListener(type) {
       listeners.delete(type)
     },
-    setSelectionRange(start) {
+    setSelectionRange(start, end = start) {
       this.selectionStart = start
+      this.selectionEnd = end
     },
   }
+
+  return { input, listeners }
+}
+
+test('binds to DOM-like inputs with maskara.on', () => {
+  const { input, listeners } = createInputMock()
 
   globalThis.requestAnimationFrame = callback => callback()
 
@@ -326,6 +416,48 @@ test('binds to DOM-like inputs with maskara.on', () => {
 
   off()
   assert.equal(listeners.size, 0)
+})
+
+test('keeps maskara.on usable when deleting an auto-filled trailing literal', () => {
+  const { input, listeners } = createInputMock()
+
+  globalThis.requestAnimationFrame = callback => callback()
+
+  const rawValues = []
+  const maskedValues = []
+  maskara.on(input, '###[BR]', {
+    onValue: value => { rawValues.push(value) },
+    onMaskara: value => { maskedValues.push(value) },
+  })
+
+  input.value = '123'
+  input.selectionStart = input.value.length
+  input.selectionEnd = input.value.length
+  listeners.get('input')({ target: input })
+
+  assert.equal(input.value, '123BR')
+  assert.equal(rawValues.at(-1), '123')
+  assert.equal(maskedValues.at(-1), '123BR')
+  assert.equal(input.selectionStart, 5)
+
+  input.value = '123B'
+  input.selectionStart = input.value.length
+  input.selectionEnd = input.value.length
+  listeners.get('input')({ target: input })
+
+  assert.equal(input.value, '12')
+  assert.equal(rawValues.at(-1), '12')
+  assert.equal(maskedValues.at(-1), '12')
+  assert.equal(input.selectionStart, 2)
+
+  input.value = '123'
+  input.selectionStart = input.value.length
+  input.selectionEnd = input.value.length
+  listeners.get('input')({ target: input })
+
+  assert.equal(input.value, '123BR')
+  assert.equal(rawValues.at(-1), '123')
+  assert.equal(maskedValues.at(-1), '123BR')
 })
 
 test('provides a Vue 3 directive for v-maskara', () => {

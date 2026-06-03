@@ -47,6 +47,8 @@ maskara.hint(pattern)                  // readable placeholder -> string
 maskara.format(pattern, value)         // semantic alias for maskara()
 maskara.rawLength(pattern, value)      // filled input chars -> number
 maskara.patternLength(pattern)         // full formatted length -> number
+maskara.explain(pattern)               // pattern tokens, variants and lengths
+maskara.transforms                     // small reusable transform helpers
 maskara.define(name, definition)       // register a named mask
 maskara.undefine(name)                 // remove a named mask
 maskara.names()                        // list registered names -> string[]
@@ -55,6 +57,12 @@ maskara.undefineSlot(symbol)           // remove a custom token
 maskara.slots()                        // list available input tokens
 maskara.on(input, pattern, options)    // bind to a DOM input -> cleanup()
 maskara.create(presets, options)       // isolated instance with its own registry
+```
+
+Need the compact runtime explicitly? Import `maskarajs/min`.
+
+```js
+import maskara from 'maskarajs/min'
 ```
 
 ## React adapter
@@ -210,6 +218,63 @@ Reasons are intentionally small and stable:
 - `complete`: value fills the mask
 
 This is designed for field feedback. Domain validation such as CPF checksum, credit card verification or business rules should still live in your validation layer.
+
+## `explain`: inspect the pattern language
+
+`explain()` returns the parsed shape of a pattern. It is useful for playgrounds, documentation, visual editors and debugging custom slots.
+
+```ts
+const info = maskara.explain('###[.]##{0-9}')
+
+info.hint          // '000.000'
+info.rawLength     // 6
+info.patternLength // 7
+info.variants[0].tokens
+// [
+//   { type: 'slot', value: '#', hint: '0', length: 1 },
+//   { type: 'literal', value: '.', length: 1 },
+//   { type: 'expression', value: '{0-9}', hint: '0', constraint: '0-9', length: 1 },
+// ]
+```
+
+For dynamic arrays and named masks, `variants` contains each possible pattern after flattening.
+
+## `transforms`: small helpers for named masks
+
+Use `maskara.transforms` when a common transform should stay boring and repeatable.
+
+```ts
+maskara.define('money', {
+  pattern: '########[,]##',
+  transform: maskara.transforms.cents,
+})
+
+maskara.raw('money', '1299,90')
+// 1299.9
+```
+
+Available helpers:
+
+| Helper | Returns |
+|---|---|
+| `transforms.number` | `number \| null` from the raw digits |
+| `transforms.cents` | decimal number from cents |
+| `transforms.dateBR` | `Date \| null` for complete `DD/MM/YYYY` values |
+| `transforms.parts(schema)` | `{ raw, masked, complete, ...parts }` using raw slices |
+
+```ts
+maskara.define('dateParts', {
+  pattern: '##[/]##[/]####',
+  transform: maskara.transforms.parts({
+    day: [0, 2],
+    month: [2, 4],
+    year: [4, 8],
+  }),
+})
+
+maskara.raw('dateParts', '31/12/2026')
+// { raw: '31122026', masked: '31/12/2026', complete: true, day: '31', month: '12', year: '2026' }
+```
 
 ## Strict instances
 
@@ -553,7 +618,9 @@ const maskaraBR = maskara.create<BrazilPresetRegistry>(br)
 
 maskaraBR('cpf', '12345678909')      // -> '123.456.789-09'
 maskaraBR('cnpj', '11222333000181')  // -> '11.222.333/0001-81'
+maskaraBR('document', '11222333000181') // -> '11.222.333/0001-81'
 maskaraBR('phone', '11987654321')    // -> '(11) 98765-4321'
+maskaraBR('plate', 'ABC1D23')         // -> 'ABC1D23'
 maskaraBR.raw('cep', '01310-930')    // -> '01310930'
 maskaraBR.raw('date', '01/12/2025')  // -> Date
 maskaraBR.raw('money', '1299,90')    // -> 1299.9
@@ -565,11 +632,17 @@ The preset includes:
 |---|---|
 | `cpf` | `000.000.000-00` |
 | `cnpj` | `00.000.000/0000-00` |
+| `document` / `cpfCnpj` | CPF or CNPJ by typed length |
 | `cep` | `00000-000`, returns `null` until complete |
 | `phone` | landline or mobile phone |
+| `mobile` | Brazilian mobile phone |
+| `landline` | Brazilian landline phone |
+| `plate` | old Brazilian plate or Mercosul plate |
 | `date` | `DD/MM/YYYY`, rejects invalid months and returns `Date \| null` |
 | `month` | accepts only `01` to `12` |
 | `money` | decimal money value from cents |
+| `currency` | alias for decimal money value from cents |
+| `percent` | decimal percent-like value from cents |
 
 ## Other official presets
 
@@ -596,7 +669,7 @@ Available focused presets:
 
 | Import | Includes |
 |---|---|
-| `maskarajs/presets/br` | `cpf`, `cnpj`, `cep`, `phone`, `date`, `month`, `money` |
+| `maskarajs/presets/br` | `cpf`, `cnpj`, `document`, `cpfCnpj`, `cep`, `phone`, `mobile`, `landline`, `plate`, `date`, `month`, `money`, `currency`, `percent` |
 | `maskarajs/presets/payment` | `card`, `card16`, `amex`, `expiry`, `cvv` |
 | `maskarajs/presets/date` | `date`, `dayMonth`, `month`, `year`, `time` |
 

@@ -1,17 +1,24 @@
 {
   "name": "maskarajs",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Engine de máscaras declarativo — framework-agnostic, zero dependências, ~4kb",
   "main": "./src/core/mask.cjs.js",
   "module": "./src/core/mask.mjs",
   "types": "./src/core/mask.d.ts",
   "scripts": {
+    "build:min": "node scripts/build-min.mjs",
+    "prepack": "npm run build:min",
     "test": "node test/mask.test.mjs"
   },
   "exports": {
     ".": {
       "import": "./src/core/mask.mjs",
       "require": "./src/core/mask.cjs.js",
+      "types": "./src/core/mask.d.ts"
+    },
+    "./min": {
+      "import": "./src/core/mask.min.mjs",
+      "require": "./src/core/mask.min.cjs.js",
       "types": "./src/core/mask.d.ts"
     },
     "./react": {

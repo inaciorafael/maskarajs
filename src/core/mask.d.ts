@@ -155,6 +155,51 @@ export interface MaskCheckResult<T = string> extends MaskApplyResult<T> {
 }
 export type MaskaraCheckResult<T = string> = MaskCheckResult<T>
 
+export type MaskExplainTokenType = 'slot' | 'literal' | 'expression'
+export type MaskaraExplainTokenType = MaskExplainTokenType
+
+export interface MaskExplainToken {
+  type: MaskExplainTokenType
+  index: number
+  value: string
+  hint?: string
+  constraint?: string
+  length: number
+}
+export type MaskaraExplainToken = MaskExplainToken
+
+export interface MaskExplainVariant {
+  pattern: string
+  hint: string
+  rawLength: number
+  patternLength: number
+  tokens: MaskExplainToken[]
+}
+export type MaskaraExplainVariant = MaskExplainVariant
+
+export interface MaskExplainResult {
+  pattern: MaskPattern
+  variants: MaskExplainVariant[]
+  hint: string
+  rawLength: number
+  patternLength: number
+}
+export type MaskaraExplainResult = MaskExplainResult
+
+export interface MaskTransforms {
+  number: MaskTransform<number | null>
+  cents: MaskTransform<number>
+  dateBR: MaskTransform<Date | null>
+  parts<T extends Record<string, readonly [number, number]>>(
+    schema: T
+  ): MaskTransform<{
+    raw: string
+    masked: string
+    complete: boolean
+  } & { [K in keyof T]: string }>
+}
+export type MaskaraTransforms = MaskTransforms
+
 /** Opções de criação de instância */
 export interface MaskCreateOptions {
   /**
@@ -280,6 +325,15 @@ export interface MaskInstance<R extends object = Record<string, string>> {
   patternLength<K extends PatternOrName<R>>(pattern: K): number
 
   /**
+   * Descreve como o engine entende o pattern: variantes, tokens, hint e tamanhos.
+   * Útil para playgrounds, documentação e debug visual.
+   */
+  explain<K extends PatternOrName<R>>(pattern: K): MaskExplainResult
+
+  /** Helpers reutilizáveis para transform em define/create */
+  readonly transforms: MaskTransforms
+
+  /**
    * Registra uma nova máscara nesta instância.
    * Não afeta outras instâncias nem o registry global.
    */
@@ -389,6 +443,12 @@ export declare namespace mask {
 
   /** Comprimento total do valor mascarado completo */
   function patternLength(pattern: MaskPattern): number
+
+  /** Explica variantes, tokens, hint e tamanhos de um pattern */
+  function explain(pattern: MaskPattern): MaskExplainResult
+
+  /** Helpers reutilizáveis para transform em define/create */
+  const transforms: MaskTransforms
 
   /** Registra máscara nomeada no registry global */
   function define<T = string>(name: string, definition: MaskDefinition<T>): void

@@ -425,8 +425,17 @@ maskaraBR('cpf', '12345678909')
 maskaraBR('phone', '11987654321')
 // '(11) 98765-4321'
 
+maskaraBR('document', '11222333000181')
+// '11.222.333/0001-81'
+
+maskaraBR('plate', 'ABC1D23')
+// 'ABC1D23'
+
 maskaraBR.raw('date', '01/12/2025')
-// Date`,
+// Date
+
+maskaraBR.raw('currency', '1299,90')
+// 1299.9`,
 };
 
 const content = {
@@ -1340,6 +1349,70 @@ month.check('month', '19').reason
 // 'invalid'`,
       },
       {
+        id: "explain",
+        menu: "explain()",
+        eyebrow: pt ? "debug visual" : "visual debug",
+        title: pt
+          ? "Mostre a linguagem do pattern do jeito que o engine enxerga."
+          : "Show the pattern language exactly as the engine sees it.",
+        description: pt
+          ? "explain entrega variantes, tokens, hint e tamanhos. E perfeito para playgrounds, documentacao viva e interfaces que desenham blocos de slot, literal e expressao."
+          : "explain returns variants, tokens, hint and lengths. It is perfect for playgrounds, living docs and interfaces that draw slot, literal and expression blocks.",
+        bullets: pt
+          ? [
+              "tokens saem como slot, literal ou expression.",
+              "variants mostra todos os patterns de arrays dinamicos.",
+              "rawLength e patternLength ajudam a montar progresso visual.",
+            ]
+          : [
+              "tokens come as slot, literal or expression.",
+              "variants shows every pattern from dynamic arrays.",
+              "rawLength and patternLength help build visual progress.",
+            ],
+        code: `const info = maskara.explain('###[.]##{0-9}')
+
+info.hint
+// '000.000'
+
+info.variants[0].tokens.map(token => token.type)
+// ['slot', 'slot', 'slot', 'literal', 'slot', 'slot', 'expression']`,
+      },
+      {
+        id: "transforms",
+        menu: "transforms",
+        eyebrow: pt ? "helpers prontos" : "ready helpers",
+        title: pt
+          ? "Transformacoes pequenas para os casos que sempre aparecem."
+          : "Small transforms for the cases that always show up.",
+        description: pt
+          ? "Use os helpers quando quiser manter dinheiro, data BR ou partes de um raw previsiveis sem repetir funcoes por todo projeto."
+          : "Use the helpers when money, Brazilian dates or raw parts should stay predictable without repeating functions across the project.",
+        bullets: pt
+          ? [
+              "cents converte centavos em decimal.",
+              "dateBR devolve Date ou null para DD/MM/YYYY completo.",
+              "parts monta objetos a partir de fatias do raw.",
+            ]
+          : [
+              "cents converts cents into a decimal number.",
+              "dateBR returns Date or null for complete DD/MM/YYYY values.",
+              "parts builds objects from raw slices.",
+            ],
+        code: `maskara.define('money', {
+  pattern: '########[,]##',
+  transform: maskara.transforms.cents,
+})
+
+maskara.raw('money', '1299,90')
+// 1299.9
+
+const dateParts = maskara.transforms.parts({
+  day: [0, 2],
+  month: [2, 4],
+  year: [4, 8],
+})`,
+      },
+      {
         id: "strict",
         menu: "strict",
         eyebrow: "create options",
@@ -1384,12 +1457,12 @@ strict.check('###', '1a2').reason
           : "Import only the package you need and create an isolated instance: br, payment or date.",
         bullets: pt
           ? [
-              "br cobre CPF, CNPJ, CEP, telefone, data, mes e dinheiro.",
+              "br cobre CPF, CNPJ, documento, CEP, telefone, placa, data, mes e dinheiro.",
               "payment cobre cartao, Amex, validade e CVV.",
               "date cobre data, dia/mes, mes, ano e horario.",
             ]
           : [
-              "br covers CPF, CNPJ, CEP, phone, date, month and money.",
+              "br covers CPF, CNPJ, document, ZIP, phone, plate, date, month and money.",
               "payment covers card, Amex, expiry and CVV.",
               "date covers date, day/month, month, year and time.",
             ],
@@ -1408,6 +1481,32 @@ pay('card', '371449635398431')
 
 dates('time', '2359')
 // '23:59'`,
+      },
+      {
+        id: "min",
+        menu: "min build",
+        eyebrow: pt ? "runtime compacto" : "compact runtime",
+        title: pt
+          ? "Quando quiser apontar direto para o build minificado."
+          : "When you want to point directly to the minified build.",
+        description: pt
+          ? "O pacote tambem exporta maskarajs/min. A API e a mesma; muda apenas o arquivo de entrada."
+          : "The package also exports maskarajs/min. The API is the same; only the entry file changes.",
+        bullets: pt
+          ? [
+              "Bom para demos, sandboxes e usos onde voce controla o bundle.",
+              "Continua zero dependencies.",
+              "Os tipos TypeScript sao os mesmos do core.",
+            ]
+          : [
+              "Good for demos, sandboxes and cases where you control the bundle.",
+              "Still zero dependencies.",
+              "TypeScript types are the same as the core entry.",
+            ],
+        code: `import maskara from 'maskarajs/min'
+
+maskara('###[.]###', '123456')
+// '123.456'`,
       },
       {
         id: "define",
@@ -1721,7 +1820,7 @@ function stringify(value: unknown) {
 
 function highlightCode(code: string) {
   const tokenPattern =
-    /(\/\/.*|\/\*[\s\S]*?\*\/|`(?:\\.|[^`])*`|'(?:\\.|[^'])*'|"(?:\\.|[^"])*"|<\/?[A-Z][A-Za-z0-9.]*\b|<\/?[a-z][A-Za-z0-9-]*\b|\b(?:import|from|export|const|let|return|if|else|true|false|null|undefined|new|function|type|interface|class|get|as|extends|public|private|readonly)\b|\b(?:maskara|raw|when|includes|startsWith|define|defineSlot|create|is|hint|patternLength|rawLength|validate|transform|on|Number|Date|String|console|log|useState|useMemo|useEffect|useForm|useMaskara|useMaskaraEngine|MaskaraProvider|inputProps|computed|ref|z|yup|Component|TextInput|View|Text)\b|\b\d+(?:\.\d+)?\b)/g;
+    /(\/\/.*|\/\*[\s\S]*?\*\/|`(?:\\.|[^`])*`|'(?:\\.|[^'])*'|"(?:\\.|[^"])*"|<\/?[A-Z][A-Za-z0-9.]*\b|<\/?[a-z][A-Za-z0-9-]*\b|\b(?:import|from|export|const|let|return|if|else|true|false|null|undefined|new|function|type|interface|class|get|as|extends|public|private|readonly)\b|\b(?:maskara|raw|unmask|apply|check|field|explain|transforms|parts|cents|dateBR|when|includes|startsWith|define|defineSlot|create|is|hint|patternLength|rawLength|validate|transform|on|Number|Date|String|console|log|useState|useMemo|useEffect|useForm|useMaskara|useMaskaraEngine|MaskaraProvider|inputProps|computed|ref|z|yup|Component|TextInput|View|Text)\b|\b\d+(?:\.\d+)?\b)/g;
   const nodes = [];
   let lastIndex = 0;
 
@@ -1795,7 +1894,7 @@ function buildDocumentationGroups(locale: Locale): DocumentationGroup[] {
       description: pt
         ? "APIs para inputs, feedback visual e leitura do estado do campo."
         : "APIs for inputs, visual feedback and reading field state.",
-      topicIds: ["apply", "field", "check", "unmask", "utilities"],
+      topicIds: ["apply", "field", "check", "unmask", "explain", "utilities"],
     },
     {
       id: "rules",
@@ -1803,7 +1902,7 @@ function buildDocumentationGroups(locale: Locale): DocumentationGroup[] {
       description: pt
         ? "Transforme raw, escolha patterns e controle rejeicoes."
         : "Transform raw, choose patterns and control rejections.",
-      topicIds: ["define", "conditional", "transform", "strict", "slots"],
+      topicIds: ["define", "conditional", "transform", "transforms", "strict", "slots"],
     },
     {
       id: "ecosystem",
@@ -1811,7 +1910,7 @@ function buildDocumentationGroups(locale: Locale): DocumentationGroup[] {
       description: pt
         ? "Integre com React, Vue, DOM puro e presets oficiais."
         : "Integrate with React, Vue, raw DOM and official presets.",
-      topicIds: ["instances", "presets", "react", "vue", "dom"],
+      topicIds: ["instances", "presets", "min", "react", "vue", "dom"],
     },
   ];
 }
