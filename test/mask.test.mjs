@@ -460,6 +460,133 @@ test('keeps maskara.on usable when deleting an auto-filled trailing literal', ()
   assert.equal(maskedValues.at(-1), '123BR')
 })
 
+test('keeps caret by raw position when editing in the middle with maskara.on', () => {
+  const { input, listeners } = createInputMock('12345678909')
+
+  globalThis.requestAnimationFrame = callback => callback()
+
+  maskara.on(input, '###[.]###[.]###[-]##')
+  listeners.get('input')({ target: input })
+
+  assert.equal(input.value, '123.456.789-09')
+
+  input.value = '123.4956.789-09'
+  input.selectionStart = 6
+  input.selectionEnd = 6
+  listeners.get('input')({ target: input })
+
+  assert.equal(input.value, '123.495.678-90')
+  assert.equal(input.selectionStart, 6)
+  assert.equal(input.selectionEnd, 6)
+
+  input.value = '123.46.789-09'
+  input.selectionStart = 5
+  input.selectionEnd = 5
+  listeners.get('input')({ target: input })
+
+  assert.equal(input.value, '123.467.890-9')
+  assert.equal(input.selectionStart, 5)
+  assert.equal(input.selectionEnd, 5)
+})
+
+test('allows insert mode in the middle of a complete mask with maskara.on', () => {
+  const { input, listeners } = createInputMock('12345678909')
+
+  globalThis.requestAnimationFrame = callback => callback()
+
+  maskara.on(input, '###[.]###[.]###[-]##')
+  listeners.get('input')({ target: input })
+
+  input.selectionStart = input.value.length
+  input.selectionEnd = input.value.length
+
+  let preventedAtEnd = false
+  listeners.get('keydown')({
+    key: '9',
+    target: input,
+    preventDefault() { preventedAtEnd = true },
+  })
+
+  assert.equal(preventedAtEnd, true)
+
+  input.selectionStart = 5
+  input.selectionEnd = 5
+
+  let preventedInMiddle = false
+  listeners.get('keydown')({
+    key: '9',
+    target: input,
+    preventDefault() { preventedInMiddle = true },
+  })
+
+  assert.equal(preventedInMiddle, false)
+
+  input.value = `${input.value.slice(0, 5)}9${input.value.slice(5)}`
+  input.selectionStart = 6
+  input.selectionEnd = 6
+  listeners.get('input')({ target: input })
+
+  assert.equal(input.value, '123.495.678-90')
+  assert.equal(input.selectionStart, 6)
+  assert.equal(input.selectionEnd, 6)
+})
+
+test('keeps caret by raw position with isolated instance on()', () => {
+  const masks = maskara.create({
+    cpf: { pattern: '###[.]###[.]###[-]##' },
+  })
+  const { input, listeners } = createInputMock('12345678909')
+
+  globalThis.requestAnimationFrame = callback => callback()
+
+  masks.on(input, 'cpf')
+  listeners.get('input')({ target: input })
+
+  input.value = '123.4956.789-09'
+  input.selectionStart = 6
+  input.selectionEnd = 6
+  listeners.get('input')({ target: input })
+
+  assert.equal(input.value, '123.495.678-90')
+  assert.equal(input.selectionStart, 6)
+})
+
+test('allows insert mode in the middle of a complete mask with isolated instance on()', () => {
+  const masks = maskara.create({
+    cpf: { pattern: '###[.]###[.]###[-]##' },
+  })
+  const { input, listeners } = createInputMock('12345678909')
+
+  globalThis.requestAnimationFrame = callback => callback()
+
+  masks.on(input, 'cpf')
+  listeners.get('input')({ target: input })
+
+  input.selectionStart = input.value.length
+  input.selectionEnd = input.value.length
+
+  let preventedAtEnd = false
+  listeners.get('keydown')({
+    key: '9',
+    target: input,
+    preventDefault() { preventedAtEnd = true },
+  })
+
+  assert.equal(preventedAtEnd, true)
+
+  input.selectionStart = 5
+  input.selectionEnd = 5
+
+  let preventedInMiddle = false
+  listeners.get('keydown')({
+    key: '9',
+    target: input,
+    preventDefault() { preventedInMiddle = true },
+  })
+
+  assert.equal(preventedInMiddle, false)
+})
+
 test('provides a Vue 3 directive for v-maskara', () => {
   const listeners = new Map()
   const input = {
@@ -503,6 +630,69 @@ test('provides a Vue 3 directive for v-maskara', () => {
 
   directive.beforeUnmount(input)
   assert.equal(listeners.size, 0)
+})
+
+test('keeps caret by raw position in Vue directive input handler', () => {
+  const listeners = new Map()
+  const input = {
+    value: '12345678909',
+    selectionStart: 11,
+    selectionEnd: 11,
+    addEventListener(type, listener, options) {
+      listeners.set(`${type}:${options === true ? 'capture' : 'bubble'}`, listener)
+    },
+    removeEventListener(type, listener, options) {
+      const key = `${type}:${options === true ? 'capture' : 'bubble'}`
+      if (listeners.get(key) === listener) listeners.delete(key)
+    },
+    setSelectionRange(start, end = start) {
+      this.selectionStart = start
+      this.selectionEnd = end
+    },
+  }
+
+  globalThis.requestAnimationFrame = callback => callback()
+
+  const directive = createMaskaraDirective()
+  directive.mounted(input, {
+    value: { pattern: '###[.]###[.]###[-]##' },
+  })
+
+  assert.equal(input.value, '123.456.789-09')
+
+  input.value = '123.4956.789-09'
+  input.selectionStart = 6
+  input.selectionEnd = 6
+  listeners.get('input:capture')({ target: input })
+
+  assert.equal(input.value, '123.495.678-90')
+  assert.equal(input.selectionStart, 6)
+
+  input.selectionStart = input.value.length
+  input.selectionEnd = input.value.length
+
+  let preventedAtEnd = false
+  listeners.get('keydown:bubble')({
+    key: '9',
+    target: input,
+    preventDefault() { preventedAtEnd = true },
+  })
+
+  assert.equal(preventedAtEnd, true)
+
+  input.selectionStart = 5
+  input.selectionEnd = 5
+
+  let preventedInMiddle = false
+  listeners.get('keydown:bubble')({
+    key: '9',
+    target: input,
+    preventDefault() { preventedInMiddle = true },
+  })
+
+  assert.equal(preventedInMiddle, false)
+
+  directive.beforeUnmount(input)
 })
 
 test('provides a Vue plugin that registers v-maskara by default', () => {

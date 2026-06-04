@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type ChangeEvent,
+  type KeyboardEvent,
+} from "react";
 import maskara from "../../src/core/mask";
 import { DonationSupport } from "./components/DonationSupport";
 import { TopNav, type Locale, type Theme } from "./components/TopNav";
@@ -9,10 +15,22 @@ type Framework = "React" | "Vue" | "Angular" | "React Native" | "Vanilla";
 type RegistryName = "BR" | "US";
 type BlockKind = "slot" | "literal" | "expr" | "name" | "pattern";
 type DynamicMaskara = {
-  (pattern: string, value: string | null | undefined): string;
-  raw(pattern: string, value: string | null | undefined): unknown;
-  hint(pattern: string): string;
+  (pattern: string | string[], value: string | null | undefined): string;
+  raw(pattern: string | string[], value: string | null | undefined): unknown;
+  rawLength(pattern: string | string[], value: string | null | undefined): number;
+  patternLength(pattern: string | string[]): number;
+  hint(pattern: string | string[]): string;
   names(): string[];
+};
+
+type CaretEngine = {
+  (pattern: string | string[], value: string | null | undefined): string;
+  rawLength(pattern: string | string[], value: string | null | undefined): number;
+  patternLength(pattern: string | string[]): number;
+  explain?(
+    pattern: string | string[],
+    value: string | null | undefined,
+  ): { rawLength?: number };
 };
 
 type Preset = {
@@ -57,6 +75,140 @@ type DocumentationGroup = {
 
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
+}
+
+function rawCursorPosition(
+  engine: CaretEngine,
+  pattern: string | string[],
+  value: string,
+  cursor: number,
+) {
+  return engine.rawLength(pattern, value.slice(0, cursor));
+}
+
+function maskedCursorPosition(
+  engine: CaretEngine,
+  pattern: string | string[],
+  masked: string,
+  rawPosition: number,
+) {
+  if (rawPosition <= 0) return 0;
+
+  for (let index = 1; index <= masked.length; index += 1) {
+    if (engine.rawLength(pattern, masked.slice(0, index)) >= rawPosition) {
+      return index;
+    }
+  }
+
+  return masked.length;
+}
+
+function preserveShowcaseCaret(
+  input: HTMLInputElement,
+  engine: CaretEngine,
+  pattern: string | string[],
+  previousValue: string,
+  previousCursor: number,
+  maskedValue: string,
+) {
+  const rawPosition = rawCursorPosition(
+    engine,
+    pattern,
+    previousValue,
+    previousCursor,
+  );
+  const wasAtEnd = previousCursor >= previousValue.length;
+  const totalRaw = engine.rawLength(pattern, maskedValue);
+  const nextCursor =
+    wasAtEnd && rawPosition >= totalRaw
+      ? maskedValue.length
+      : maskedCursorPosition(engine, pattern, maskedValue, rawPosition);
+
+  const applyCursor = () => {
+    if (typeof document === "undefined" || document.activeElement !== input) {
+      return;
+    }
+
+    input.setSelectionRange(nextCursor, nextCursor);
+  };
+
+  if (typeof window === "undefined") {
+    applyCursor();
+    return;
+  }
+
+  window.requestAnimationFrame(applyCursor);
+}
+
+function applyMaskedInputChange(
+  event: ChangeEvent<HTMLInputElement>,
+  engine: CaretEngine,
+  pattern: string | string[],
+  setValue: (value: string) => void,
+) {
+  const input = event.currentTarget;
+  const previousValue = input.value;
+  const previousCursor = input.selectionStart ?? previousValue.length;
+  const maskedValue = engine(pattern, previousValue);
+
+  setValue(maskedValue);
+  preserveShowcaseCaret(
+    input,
+    engine,
+    pattern,
+    previousValue,
+    previousCursor,
+    maskedValue,
+  );
+}
+
+function shouldBlockShowcaseTextInput(
+  engine: CaretEngine,
+  pattern: string | string[],
+  value: string,
+  selectionStart: number,
+  selectionEnd: number,
+) {
+  const rawLength = engine.rawLength(pattern, value);
+  const maxLength =
+    engine.explain?.(pattern, value)?.rawLength ?? engine.patternLength(pattern);
+
+  if (rawLength < maxLength) return false;
+
+  const rawStart = engine.rawLength(pattern, value.slice(0, selectionStart));
+  const rawEnd = engine.rawLength(pattern, value.slice(0, selectionEnd));
+
+  if (rawEnd > rawStart) return false;
+
+  return rawStart >= maxLength;
+}
+
+function handleMaskedInputKeyDown(
+  event: KeyboardEvent<HTMLInputElement>,
+  engine: CaretEngine,
+  pattern: string | string[],
+) {
+  if (
+    event.key.length !== 1 ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.altKey
+  ) {
+    return;
+  }
+
+  const input = event.currentTarget;
+  const value = input.value;
+  const start = input.selectionStart ?? value.length;
+  const end = input.selectionEnd ?? start;
+
+  try {
+    if (shouldBlockShowcaseTextInput(engine, pattern, value, start, end)) {
+      event.preventDefault();
+    }
+  } catch {
+    // Let the invalid-pattern state render in the playground instead of blocking typing.
+  }
 }
 
 const shell = "mx-auto w-[min(1180px,calc(100%_-_32px))]";
@@ -2425,7 +2577,15 @@ function Playground({
                 value={inputValue}
                 placeholder={result.ok ? result.hint : t.typeValue}
                 onChange={(event) =>
-                  setInputValue(maskara(preset.pattern, event.target.value))
+                  applyMaskedInputChange(
+                    event,
+                    maskara,
+                    preset.pattern,
+                    setInputValue,
+                  )
+                }
+                onKeyDown={(event) =>
+                  handleMaskedInputKeyDown(event, maskara, preset.pattern)
                 }
               />
             </label>
@@ -2554,11 +2714,25 @@ function CustomLab({ locale }: { locale: Locale }) {
                 placeholder={result.ok ? result.hint : t.fix}
                 onChange={(event) => {
                   try {
-                    setInputValue(
-                      maskara(parsePattern(patternText), event.target.value),
+                    applyMaskedInputChange(
+                      event,
+                      maskara,
+                      parsePattern(patternText),
+                      setInputValue,
                     );
                   } catch {
                     setInputValue(event.target.value);
+                  }
+                }}
+                onKeyDown={(event) => {
+                  try {
+                    handleMaskedInputKeyDown(
+                      event,
+                      maskara,
+                      parsePattern(patternText),
+                    );
+                  } catch {
+                    // Invalid custom pattern: keep typing available.
                   }
                 }}
               />
@@ -2670,7 +2844,10 @@ function ValidateDemo({ locale }: { locale: Locale }) {
             value={monthValue}
             placeholder={maskara.hint("month")}
             onChange={(event) =>
-              setMonthValue(maskara("month", event.target.value))
+              applyMaskedInputChange(event, maskara, "month", setMonthValue)
+            }
+            onKeyDown={(event) =>
+              handleMaskedInputKeyDown(event, maskara, "month")
             }
           />
         </label>
@@ -2681,7 +2858,15 @@ function ValidateDemo({ locale }: { locale: Locale }) {
             value={dateValue}
             placeholder={maskara.hint("dateStrict")}
             onChange={(event) =>
-              setDateValue(maskara("dateStrict", event.target.value))
+              applyMaskedInputChange(
+                event,
+                maskara,
+                "dateStrict",
+                setDateValue,
+              )
+            }
+            onKeyDown={(event) =>
+              handleMaskedInputKeyDown(event, maskara, "dateStrict")
             }
           />
         </label>
@@ -2734,7 +2919,12 @@ function ConditionalDemo({ locale }: { locale: Locale }) {
             className={inputClass}
             value={masked}
             placeholder={maskara.hint("smartDocument")}
-            onChange={(event) => setValue(maskara("smartDocument", event.target.value))}
+            onChange={(event) =>
+              applyMaskedInputChange(event, maskara, "smartDocument", setValue)
+            }
+            onKeyDown={(event) =>
+              handleMaskedInputKeyDown(event, maskara, "smartDocument")
+            }
           />
         </label>
         <MiniResults rows={[["selected", selected], ["raw", stringify(raw) || '""']]} />
@@ -2763,7 +2953,10 @@ function DefineDemo({ locale }: { locale: Locale }) {
             value={dateValue}
             placeholder={maskara.hint("date")}
             onChange={(event) =>
-              setDateValue(maskara("date", event.target.value))
+              applyMaskedInputChange(event, maskara, "date", setDateValue)
+            }
+            onKeyDown={(event) =>
+              handleMaskedInputKeyDown(event, maskara, "date")
             }
           />
         </label>
@@ -2774,7 +2967,10 @@ function DefineDemo({ locale }: { locale: Locale }) {
             value={moneyValue}
             placeholder={maskara.hint("money")}
             onChange={(event) =>
-              setMoneyValue(maskara("money", event.target.value))
+              applyMaskedInputChange(event, maskara, "money", setMoneyValue)
+            }
+            onKeyDown={(event) =>
+              handleMaskedInputKeyDown(event, maskara, "money")
             }
           />
         </label>
@@ -2856,7 +3052,10 @@ function CreateDemo({ locale }: { locale: Locale }) {
             value={maskedValue}
             placeholder={currentMask.hint(name)}
             onChange={(event) =>
-              setValue(currentMask(name, event.target.value))
+              applyMaskedInputChange(event, currentMask, name, setValue)
+            }
+            onKeyDown={(event) =>
+              handleMaskedInputKeyDown(event, currentMask, name)
             }
           />
         </label>
@@ -2892,7 +3091,15 @@ function CustomSlotsDemo({ locale }: { locale: Locale }) {
             value={globalValue}
             placeholder={maskara.hint("NNN[-]NN")}
             onChange={(event) =>
-              setGlobalValue(maskara("NNN[-]NN", event.target.value))
+              applyMaskedInputChange(
+                event,
+                maskara,
+                "NNN[-]NN",
+                setGlobalValue,
+              )
+            }
+            onKeyDown={(event) =>
+              handleMaskedInputKeyDown(event, maskara, "NNN[-]NN")
             }
           />
         </label>
@@ -2903,7 +3110,15 @@ function CustomSlotsDemo({ locale }: { locale: Locale }) {
             value={hexValue}
             placeholder={teamMaskara.hint("HHHHHH")}
             onChange={(event) =>
-              setHexValue(teamMaskara("HHHHHH", event.target.value))
+              applyMaskedInputChange(
+                event,
+                teamMaskara,
+                "HHHHHH",
+                setHexValue,
+              )
+            }
+            onKeyDown={(event) =>
+              handleMaskedInputKeyDown(event, teamMaskara, "HHHHHH")
             }
           />
         </label>
@@ -2914,7 +3129,10 @@ function CustomSlotsDemo({ locale }: { locale: Locale }) {
             value={vowelValue}
             placeholder={teamMaskara.hint("VVV")}
             onChange={(event) =>
-              setVowelValue(teamMaskara("VVV", event.target.value))
+              applyMaskedInputChange(event, teamMaskara, "VVV", setVowelValue)
+            }
+            onKeyDown={(event) =>
+              handleMaskedInputKeyDown(event, teamMaskara, "VVV")
             }
           />
         </label>
@@ -2991,7 +3209,12 @@ function BrazilPresetsDemo({ locale }: { locale: Locale }) {
             className={inputClass}
             value={masked}
             placeholder={maskaraBR.hint(name)}
-            onChange={(event) => setValue(maskaraBR(name, event.target.value))}
+            onChange={(event) =>
+              applyMaskedInputChange(event, maskaraBR, name, setValue)
+            }
+            onKeyDown={(event) =>
+              handleMaskedInputKeyDown(event, maskaraBR, name)
+            }
           />
         </label>
         <MiniResults

@@ -570,6 +570,58 @@ function buildCheckResult(result, value, candidateLength) {
   }
 }
 
+function rawCursorPosition(engine, pattern, value, cursor) {
+  const beforeCursor = String(value).slice(0, Math.max(0, cursor))
+  return engine.rawLength(pattern, beforeCursor)
+}
+
+function maskedCursorPosition(engine, pattern, masked, rawPosition) {
+  if (rawPosition <= 0) return 0
+
+  for (let index = 0; index <= masked.length; index++) {
+    if (engine.rawLength(pattern, masked.slice(0, index)) >= rawPosition) {
+      return index
+    }
+  }
+
+  return masked.length
+}
+
+function preserveRawCursor(input, engine, pattern, previousValue, previousCursor, maskedValue) {
+  const rawPosition = rawCursorPosition(engine, pattern, previousValue, previousCursor)
+  const previousText = String(previousValue)
+  const totalRaw = engine.rawLength(pattern, maskedValue)
+  if (previousCursor >= previousText.length && rawPosition >= totalRaw) {
+    requestAnimationFrame(() => {
+      input.setSelectionRange(maskedValue.length, maskedValue.length)
+    })
+    return
+  }
+
+  const nextCursor = maskedCursorPosition(engine, pattern, maskedValue, rawPosition)
+
+  requestAnimationFrame(() => {
+    const position = Math.max(0, Math.min(nextCursor, maskedValue.length))
+    input.setSelectionRange(position, position)
+  })
+}
+
+function shouldBlockTextInput(engine, pattern, value, selectionStart, selectionEnd, maxLength) {
+  const text = String(value ?? '')
+  const start = Math.max(0, selectionStart ?? text.length)
+  const end = Math.max(start, selectionEnd ?? start)
+  const rawLength = engine.rawLength(pattern, text)
+
+  if (rawLength < maxLength) return false
+
+  const rawStart = engine.rawLength(pattern, text.slice(0, start))
+  const rawEnd = engine.rawLength(pattern, text.slice(0, end))
+
+  if (rawEnd > rawStart) return false
+
+  return rawStart >= maxLength
+}
+
 function resolveEntryPattern(pattern, value, registryMap, slots, cacheId, slotsVersion) {
   const entry = typeof pattern === 'string' && registryMap?.has(pattern)
     ? registryMap.get(pattern)
@@ -1078,11 +1130,10 @@ mask.on = function (input, pattern, options = {}) {
   function onKeydown(e) {
     if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) return
     const patterns = currentPatterns()
-    let validate
-    if (typeof pattern === 'string' && registry.has(pattern)) validate = registry.get(pattern).validate
-    const chars    = extractInputChars(e.target.value, patterns, validate, globalSlots, 'global', globalSlotsVersion)
     const maxLimit = Math.max(...patterns.map(p => inputCount(p, globalSlots, 'global', globalSlotsVersion)))
-    if (chars.length >= maxLimit) e.preventDefault()
+    const start = e.target.selectionStart ?? String(e.target.value ?? '').length
+    const end = e.target.selectionEnd ?? start
+    if (shouldBlockTextInput(mask, pattern, e.target.value, start, end, maxLimit)) e.preventDefault()
   }
 
   // Handler de input: aplica máscara, preserva cursor, dispara callbacks
@@ -1091,14 +1142,9 @@ mask.on = function (input, pattern, options = {}) {
     const raw    = el.value
     const masked = mask(pattern, raw)
     const cursor = el.selectionStart ?? masked.length
-    const diff   = masked.length - raw.length
 
     el.value = masked
-
-    requestAnimationFrame(() => {
-      const pos = Math.max(0, cursor + diff)
-      el.setSelectionRange(pos, pos)
-    })
+    preserveRawCursor(el, mask, pattern, raw, cursor, masked)
 
     onMaskara?.(masked)
     onMasked?.(masked)
@@ -1317,9 +1363,10 @@ mask.create = function (presets = {}, options = {}) {
     function onKeydown(e) {
       if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) return
       const pats     = currentPatterns()
-      const chars    = extractInputChars(e.target.value, pats, resolveLocalEntry(pattern)?.validate, localSlots, localCacheId, localSlotsVersion, strict)
       const maxLimit = Math.max(...pats.map(p => inputCount(p, localSlots, localCacheId, localSlotsVersion)))
-      if (chars.length >= maxLimit) e.preventDefault()
+      const start = e.target.selectionStart ?? String(e.target.value ?? '').length
+      const end = e.target.selectionEnd ?? start
+      if (shouldBlockTextInput(instance, pattern, e.target.value, start, end, maxLimit)) e.preventDefault()
     }
 
     function handler(e) {
@@ -1327,12 +1374,8 @@ mask.create = function (presets = {}, options = {}) {
       const raw    = el.value
       const masked = instance(pattern, raw)
       const cursor = el.selectionStart ?? masked.length
-      const diff   = masked.length - raw.length
       el.value     = masked
-      requestAnimationFrame(() => {
-        const pos = Math.max(0, cursor + diff)
-        el.setSelectionRange(pos, pos)
-      })
+      preserveRawCursor(el, instance, pattern, raw, cursor, masked)
       onMaskara?.(masked)
       onMasked?.(masked)
       onValue?.(instance.raw(pattern, masked))

@@ -11,6 +11,62 @@ function frame(callback) {
   callback()
 }
 
+function rawCursorPosition(engine, pattern, value, cursor) {
+  const beforeCursor = String(value).slice(0, Math.max(0, cursor))
+  return engine.rawLength(pattern, beforeCursor)
+}
+
+function maskedCursorPosition(engine, pattern, masked, rawPosition) {
+  if (rawPosition <= 0) return 0
+
+  for (let index = 0; index <= masked.length; index++) {
+    if (engine.rawLength(pattern, masked.slice(0, index)) >= rawPosition) {
+      return index
+    }
+  }
+
+  return masked.length
+}
+
+function preserveRawCursor(input, engine, pattern, previousValue, previousCursor, maskedValue) {
+  const rawPosition = rawCursorPosition(engine, pattern, previousValue, previousCursor)
+  const previousText = String(previousValue)
+  const totalRaw = engine.rawLength(pattern, maskedValue)
+  if (previousCursor >= previousText.length && rawPosition >= totalRaw) {
+    frame(() => {
+      input.setSelectionRange?.(maskedValue.length, maskedValue.length)
+    })
+    return
+  }
+
+  const nextCursor = maskedCursorPosition(engine, pattern, maskedValue, rawPosition)
+
+  frame(() => {
+    const position = Math.max(0, Math.min(nextCursor, maskedValue.length))
+    input.setSelectionRange?.(position, position)
+  })
+}
+
+function shouldBlockTextInput(engine, pattern, value, selectionStart, selectionEnd, maxLength) {
+  const text = String(value ?? '')
+  const start = Math.max(0, selectionStart ?? text.length)
+  const end = Math.max(start, selectionEnd ?? start)
+  const rawLength = engine.rawLength(pattern, text)
+
+  if (rawLength < maxLength) return false
+
+  const rawStart = engine.rawLength(pattern, text.slice(0, start))
+  const rawEnd = engine.rawLength(pattern, text.slice(0, end))
+
+  if (rawEnd > rawStart) return false
+
+  return rawStart >= maxLength
+}
+
+function maxRawLength(engine, pattern, value) {
+  return engine.explain?.(pattern, value)?.rawLength ?? engine.patternLength(pattern)
+}
+
 function normalizeBinding(value, defaults = {}) {
   if (value && typeof value === 'object' && !Array.isArray(value)) {
     return {
@@ -53,9 +109,12 @@ function bind(el, binding, defaults = {}) {
 
   function onKeydown(event) {
     if (event.key.length !== 1 || event.ctrlKey || event.metaKey || event.altKey) return
-    const rawLength = config.engine.rawLength(config.pattern, el.value)
-    const maxLength = config.engine.patternLength(config.pattern)
-    if (rawLength >= maxLength) event.preventDefault()
+    const maxLength = maxRawLength(config.engine, config.pattern, el.value)
+    const start = event.target?.selectionStart ?? String(el.value ?? '').length
+    const end = event.target?.selectionEnd ?? start
+    if (shouldBlockTextInput(config.engine, config.pattern, el.value, start, end, maxLength)) {
+      event.preventDefault()
+    }
   }
 
   function onInput(event) {
@@ -63,14 +122,9 @@ function bind(el, binding, defaults = {}) {
     const raw = target.value ?? ''
     const cursor = target.selectionStart ?? raw.length
     const masked = config.engine(config.pattern, raw)
-    const diff = masked.length - raw.length
 
     target.value = masked
-
-    frame(() => {
-      const position = Math.max(0, cursor + diff)
-      target.setSelectionRange?.(position, position)
-    })
+    preserveRawCursor(target, config.engine, config.pattern, raw, cursor, masked)
 
     config.onMaskara?.(masked)
     config.onMasked?.(masked)
