@@ -1,7 +1,9 @@
-function validMonth(raw) {
-  if (raw.length < 4) return true
-  const month = Number(raw.slice(2, 4))
-  return month >= 1 && month <= 12
+function validDateMonth({ ctx }) {
+  return ctx.between({ from: 2, to: 4, min: 1, max: 12 })
+}
+
+function validMonth({ ctx }) {
+  return ctx.between({ from: 0, to: 2, min: 1, max: 12 })
 }
 
 function toDate(raw, _masked, complete) {
@@ -44,12 +46,12 @@ const br = Object.freeze({
   },
   date: {
     pattern: '##[/]{0-1}#[/]####',
-    validate: validMonth,
+    validate: validDateMonth,
     transform: toDate,
   },
   month: {
     pattern: '{0-1}#',
-    validate: (raw, _masked, complete) => !complete || (Number(raw) >= 1 && Number(raw) <= 12),
+    validate: validMonth,
   },
   money: {
     pattern: '########[,]##',

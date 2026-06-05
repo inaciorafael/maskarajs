@@ -1,7 +1,7 @@
 {
   "name": "maskarajs",
   "version": "1.0.5",
-  "description": "Engine de máscaras declarativo — framework-agnostic, zero dependências, ~4kb",
+  "description": "Declarative input mask engine with contextual validation, transforms, presets and lightweight framework adapters.",
   "main": "./src/core/mask.cjs.js",
   "module": "./src/core/mask.mjs",
   "types": "./src/core/mask.d.ts",
