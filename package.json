@@ -1,6 +1,6 @@
 {
   "name": "maskarajs",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Engine de máscaras declarativo — framework-agnostic, zero dependências, ~4kb",
   "main": "./src/core/mask.cjs.js",
   "module": "./src/core/mask.mjs",
