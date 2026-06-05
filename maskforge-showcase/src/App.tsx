@@ -249,7 +249,7 @@ const namedPatterns: Record<string, string | string[]> = {
 if (!maskara.names().includes("month")) {
   maskara.define("month", {
     pattern: namedPatterns.month,
-    validate: (raw, _masked, complete) => {
+    validate: ({ raw, complete }) => {
       if (!complete) return true;
       const month = Number(raw);
       return month >= 1 && month <= 12;
@@ -260,10 +260,8 @@ if (!maskara.names().includes("month")) {
 if (!maskara.names().includes("date")) {
   maskara.define("date", {
     pattern: namedPatterns.date,
-    validate: (raw) => {
-      if (raw.length < 4) return true;
-      const month = Number(raw.slice(2, 4));
-      return month >= 1 && month <= 12;
+    validate: ({ ctx }) => {
+      return ctx.between({ from: 2, to: 4, min: 1, max: 12 });
     },
     transform: (raw, _masked, complete) => {
       if (!complete) return null;
@@ -278,10 +276,8 @@ if (!maskara.names().includes("date")) {
 if (!maskara.names().includes("dateStrict")) {
   maskara.define("dateStrict", {
     pattern: namedPatterns.dateStrict,
-    validate: (raw) => {
-      if (raw.length < 4) return true;
-      const month = Number(raw.slice(2, 4));
-      return month >= 1 && month <= 12;
+    validate: ({ ctx }) => {
+      return ctx.between({ from: 2, to: 4, min: 1, max: 12 });
     },
     transform: (raw, _masked, complete) => {
       if (!complete) return null;

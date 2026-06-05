@@ -82,7 +82,7 @@ test('supports expression slots', () => {
 test('supports validate and transform on named masks', () => {
   maskara.define('testMonth', {
     pattern: '{0-1}#',
-    validate: (raw, _masked, complete) => !complete || (Number(raw) >= 1 && Number(raw) <= 12),
+    validate: ({ ctx }) => ctx.between({ from: 0, to: 2, min: 1, max: 12 }),
   })
 
   maskara.define('testMoney', {
@@ -96,6 +96,59 @@ test('supports validate and transform on named masks', () => {
 
   maskara.undefine('testMonth')
   maskara.undefine('testMoney')
+})
+
+test('supports validate payload helpers and progressive custom rules', () => {
+  maskara.define('testContextDate', {
+    pattern: '##[/]##[/]####',
+    validate: ({ raw, masked, complete, ctx }) => {
+      const { between } = ctx
+      assert.equal(typeof raw, 'string')
+      assert.equal(typeof masked, 'string')
+      assert.equal(typeof complete, 'boolean')
+      assert.equal(ctx.isEmpty(), raw.length === 0)
+
+      if (!ctx.oneOf({ at: 0, values: ['0', '1', '2', '3'] })) return false
+      if (!ctx.when({ from: 0, to: 2 }, ({ value }) => value !== '00')) return false
+      const month = ctx.slice({ from: 2, to: 4 })
+      return (
+        ctx.length() < 2 || ctx.char(0) === raw.charAt(0) &&
+        (!ctx.has({ at: 2 }) || ctx.char({ at: 2 }) === month.charAt(0)) &&
+        ctx.when({ from: 0, to: 2 }, ({ number }) => number >= 1) &&
+        between({ from: 2, to: 4, min: 1, max: 12 }) &&
+        ctx.length() <= 8
+      )
+    },
+  })
+
+  maskara.define('testContextCode', {
+    pattern: '###',
+    validate: ({ complete, ctx }) => {
+      if (!ctx.startsWith('5')) return false
+      return !complete || ctx.endsWith({ value: '9' })
+    },
+  })
+
+  assert.equal(maskara('testContextDate', '01122025'), '01/12/2025')
+  assert.equal(maskara('testContextDate', '00122025'), '0')
+  assert.equal(maskara('testContextDate', '01192025'), '01/1')
+  assert.equal(maskara('testContextCode', '529'), '529')
+  assert.equal(maskara('testContextCode', '528'), '52')
+  assert.equal(maskara('testContextCode', '129'), '')
+
+  maskara.undefine('testContextDate')
+  maskara.undefine('testContextCode')
+})
+
+test('keeps legacy positional validate working at runtime', () => {
+  maskara.define('testLegacyRuntime', {
+    pattern: '###',
+    validate: raw => raw !== '123',
+  })
+
+  assert.equal(maskara('testLegacyRuntime', '123'), '12')
+
+  maskara.undefine('testLegacyRuntime')
 })
 
 test('supports apply with rich metadata', () => {

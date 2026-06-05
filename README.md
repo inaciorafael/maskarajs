@@ -422,10 +422,8 @@ maskara('{[0-9a-fA-F]}{[0-9a-fA-F]}{[0-9a-fA-F]}{[0-9a-fA-F]}{[0-9a-fA-F]}{[0-9a
 ```js
 maskara.define('date', {
   pattern: '##[/]##[/]####',
-  validate: (raw, masked, complete) => {
-    if (raw.length < 4) return true
-    const month = Number(raw.slice(2, 4))
-    return month >= 1 && month <= 12
+  validate: ({ ctx }) => {
+    return ctx.between({ from: 2, to: 4, min: 1, max: 12 })
   },
   transform: (raw, masked, complete) => {
     if (!complete) return null
@@ -450,10 +448,8 @@ Use `validate` on named masks when the rule depends on what has already been typ
 ```js
 maskara.define('month', {
   pattern: '{0-1}#',
-  validate: (raw, masked, complete) => {
-    if (!complete) return true
-    const month = Number(raw)
-    return month >= 1 && month <= 12
+  validate: ({ ctx }) => {
+    return ctx.between({ from: 0, to: 2, min: 1, max: 12 })
   },
 })
 
@@ -461,6 +457,58 @@ maskara('month', '12') // -> '12'
 maskara('month', '19') // -> '1'
 maskara.is('month', '12') // -> true
 maskara.is('month', '19') // -> false
+```
+
+`validate` receives a single payload, so TypeScript can autocomplete the destructured fields:
+
+```js
+validate: ({ raw, masked, complete, ctx }) => boolean
+```
+
+Boolean helpers such as `between`, `is`, `oneOf`, `startsWith` and `endsWith` are progressive. If the target character/range is not filled yet, they return `true` and keep typing fluid. They only block once there is enough raw input to evaluate the rule.
+
+`ctx.when` is the escape hatch for custom validation. It waits until the requested character or range is filled before running your predicate:
+
+```js
+maskara.define('customMonth', {
+  pattern: '##[/]##[/]####',
+  validate: ({ ctx }) => {
+    return ctx.when({ from: 2, to: 4 }, ({ value, number }) => {
+      return value !== '00' && number >= 1 && number <= 12
+    })
+  },
+})
+```
+
+`ctx` reads from the current raw value being tested.
+
+| Helper | Purpose |
+|---|---|
+| `ctx.char(at)` or `ctx.char({ at })` | Returns one raw character |
+| `ctx.has(at)` or `ctx.has({ at })` | Checks whether a raw position has been typed |
+| `ctx.slice({ from, to })` | Reads a raw range. `to` is exclusive |
+| `ctx.toNumber({ from, to })` | Reads a raw range as a number |
+| `ctx.when({ at }, fn)` or `ctx.when({ from, to }, fn)` | Runs a custom rule only when that raw position/range is filled |
+| `ctx.is({ at, value })` | Progressively checks one raw character against one value |
+| `ctx.oneOf({ at, values })` | Progressively checks one raw character against many values |
+| `ctx.between({ from, to, min, max })` | Progressively checks whether a numeric raw range is inside a range |
+| `ctx.length()` | Current raw length |
+| `ctx.isEmpty()` | Whether no raw character has been typed |
+| `ctx.startsWith(value)` or `ctx.startsWith({ value })` | Progressive raw prefix check |
+| `ctx.endsWith(value)` or `ctx.endsWith({ value })` | Progressive raw suffix check |
+
+```js
+maskara.define('code', {
+  pattern: '###',
+  validate: ({ complete, ctx }) => {
+    if (!ctx.startsWith('5')) return false
+    return !complete || ctx.endsWith('9')
+  },
+})
+
+maskara('code', '529') // -> '529'
+maskara('code', '528') // -> '52'
+maskara('code', '129') // -> ''
 ```
 
 ## Conditional masks
@@ -730,11 +778,12 @@ for (let i = 0; i < iterations; i++) {
 
 ```js
 // transform(raw, masked, complete) => T
-// validate(raw, masked, complete) => boolean
+// validate({ raw, masked, complete, ctx }) => boolean
 //
 // raw      -> input chars without literals
 // masked   -> formatted string
 // complete -> true when every slot is filled
+// ctx      -> raw-position helpers for incremental validation
 //
 // Without transform -> maskara.raw() always returns the raw string
 // With transform    -> maskara.raw() always returns whatever transform returns

@@ -277,6 +277,89 @@ throw new Error(`${label}: "${name}" validate precisa ser uma função`)
 function defaultValidate() {
 return true
 }
+function readIndexArg(arg) {
+return typeof arg === 'object' && arg !== null ? arg.at : arg
+}
+function readValueArg(arg) {
+return typeof arg === 'object' && arg !== null ? arg.value : arg
+}
+function normalizeWhenRange(options = {}) {
+if ('at' in options) return { at: options.at, from: options.at, to: options.at + 1 }
+const from = options.from ?? 0
+return { from, to: options.to ?? from + 1 }
+}
+function createValidateContext(raw) {
+const value = String(raw ?? '')
+const slice = ({ from = 0, to } = {}) => value.slice(from, to)
+const toNumber = ({ from = 0, to } = {}) => {
+const sliced = slice({ from, to })
+return sliced ? Number(sliced) : NaN
+}
+const when = (options, predicate) => {
+const range = normalizeWhenRange(options)
+if (value.length < range.to) return true
+const current = slice(range)
+return predicate({
+value: current,
+raw: current,
+char: current.charAt(0),
+number: toNumber(range),
+at: range.at,
+from: range.from,
+to: range.to,
+})
+}
+return {
+char(options) {
+const at = readIndexArg(options)
+return value.charAt(at)
+},
+has(options) {
+const at = readIndexArg(options)
+return Number.isInteger(at) && at >= 0 && at < value.length
+},
+slice,
+toNumber,
+when,
+is({ at, value: expected }) {
+return when({ at }, ({ value }) => value === String(expected))
+},
+oneOf({ at, values = [] }) {
+const accepted = values.map(String)
+return when({ at }, ({ value }) => accepted.includes(value))
+},
+between({ from = 0, to, min, max }) {
+return when({ from, to }, ({ number }) => Number.isFinite(number) && number >= min && number <= max)
+},
+length() {
+return value.length
+},
+isEmpty() {
+return value.length === 0
+},
+startsWith(options) {
+const expected = String(readValueArg(options) ?? '')
+if (value.length < expected.length) return true
+return value.startsWith(expected)
+},
+endsWith(options) {
+const expected = String(readValueArg(options) ?? '')
+if (value.length < expected.length) return true
+return value.endsWith(expected)
+},
+}
+}
+function usesValidatePayload(validate) {
+const source = Function.prototype.toString.call(validate).trim()
+return /^(?:async\s*)?(?:function\b[^(]*\(\s*\{|\(\s*\{[\s\S]*?\}\s*\)\s*=>|\{[\s\S]*?\}\s*=>)/.test(source)
+}
+function callValidate(validate, raw, masked, complete) {
+const ctx = createValidateContext(raw)
+if (usesValidatePayload(validate)) {
+return validate({ raw, masked, complete, ctx })
+}
+return validate(raw, masked, complete, ctx)
+}
 function toNumber(raw) {
 return raw ? Number(raw) : null
 }
@@ -553,7 +636,7 @@ const next = [...valid, ch]
 const nextRaw = next.join('')
 const nextMasked = applyTokens(compiled.tokens, next, compiled.inputCount)
 const complete = next.length >= compiled.inputCount
-if (!validate(nextRaw, nextMasked, complete)) break
+if (!callValidate(validate, nextRaw, nextMasked, complete)) break
 valid.push(ch)
 ti++
 } else if (strict) {

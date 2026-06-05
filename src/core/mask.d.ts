@@ -44,8 +44,89 @@ export type MaskaraPattern = MaskPattern
 export type MaskTransform<T> = (raw: string, masked: string, complete: boolean) => T
 export type MaskaraTransform<T> = MaskTransform<T>
 
+export interface MaskValidateIndexOptions {
+  at: number
+}
+export type MaskaraValidateIndexOptions = MaskValidateIndexOptions
+
+export interface MaskValidateRangeOptions {
+  from: number
+  to?: number
+}
+export type MaskaraValidateRangeOptions = MaskValidateRangeOptions
+
+export interface MaskValidateIsOptions {
+  at: number
+  value: string | number
+}
+export type MaskaraValidateIsOptions = MaskValidateIsOptions
+
+export interface MaskValidateOneOfOptions {
+  at: number
+  values: Array<string | number>
+}
+export type MaskaraValidateOneOfOptions = MaskValidateOneOfOptions
+
+export interface MaskValidateBetweenOptions extends MaskValidateRangeOptions {
+  min: number
+  max: number
+}
+export type MaskaraValidateBetweenOptions = MaskValidateBetweenOptions
+
+export interface MaskValidateValueOptions {
+  value: string | number
+}
+export type MaskaraValidateValueOptions = MaskValidateValueOptions
+
+export type MaskValidateWhenOptions = MaskValidateIndexOptions | MaskValidateRangeOptions
+export type MaskaraValidateWhenOptions = MaskValidateWhenOptions
+
+export interface MaskValidateWhenPayload {
+  value: string
+  raw: string
+  char: string
+  number: number
+  at?: number
+  from: number
+  to: number
+}
+export type MaskaraValidateWhenPayload = MaskValidateWhenPayload
+
+/** Utilitários para validar posições do raw incremental */
+export interface MaskValidateContext {
+  char(options: MaskValidateIndexOptions): string
+  char(at: number): string
+  has(options: MaskValidateIndexOptions): boolean
+  has(at: number): boolean
+  slice(options: MaskValidateRangeOptions): string
+  toNumber(options: MaskValidateRangeOptions): number
+  when(options: MaskValidateWhenOptions, predicate: (value: MaskValidateWhenPayload) => boolean): boolean
+  is(options: MaskValidateIsOptions): boolean
+  oneOf(options: MaskValidateOneOfOptions): boolean
+  between(options: MaskValidateBetweenOptions): boolean
+  length(): number
+  isEmpty(): boolean
+  startsWith(options: MaskValidateValueOptions): boolean
+  startsWith(value: string | number): boolean
+  endsWith(options: MaskValidateValueOptions): boolean
+  endsWith(value: string | number): boolean
+}
+export type MaskaraValidateContext = MaskValidateContext
+
+/** Payload recomendado para validate com autocomplete por desestruturação */
+export interface MaskValidatePayload {
+  raw: string
+  masked: string
+  complete: boolean
+  ctx: MaskValidateContext
+}
+export type MaskaraValidatePayload = MaskValidatePayload
+
 /** Validação incremental — retorna false para recusar o próximo caractere */
-export type MaskValidate = (raw: string, masked: string, complete: boolean) => boolean
+export type MaskPayloadValidate = (payload: MaskValidatePayload) => boolean
+export type MaskaraPayloadValidate = MaskPayloadValidate
+
+export type MaskValidate = MaskPayloadValidate
 export type MaskaraValidate = MaskValidate
 
 /** Predicado usado por um slot customizado */
@@ -83,6 +164,7 @@ export type MaskaraConditionalDefinition<T = string, K extends string = string> 
 /** Definição de uma máscara nomeada */
 export type MaskDefinition<T = string> = MaskPatternDefinition<T> | MaskConditionalDefinition<T>
 export type MaskaraDefinition<T = string> = MaskDefinition<T>
+
 
 /** Opções de mask.on */
 export interface MaskOnOptions<T> {
